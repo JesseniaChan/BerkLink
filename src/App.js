@@ -4,36 +4,34 @@ import { supabase } from './supabaseClient';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
+import MyGroup from './components/MyGroup';
 
 function App() {
   const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [onboardingDone, setOnboardingDone] = useState(false);
+  const [page, setPage] = useState('onboarding'); // 'onboarding' | 'mygroup'
 
   useEffect(() => {
-    // Check if user is already logged in
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setLoading(false);
     };
-
     checkUser();
 
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user || null);
       }
     );
-
     return () => subscription?.unsubscribe();
   }, []);
 
   const handleOnboardingComplete = () => {
-    console.log('Onboarding completed for user:', user.id);
-    // Redirect to dashboard or home page
-    // window.location.href = '/dashboard';
+    setOnboardingDone(true);
+    setPage('mygroup');
   };
 
   if (loading) {
@@ -44,19 +42,44 @@ function App() {
     );
   }
 
-  // If user is logged in, show onboarding flow
   if (user) {
     return (
       <div className="App">
-        <OnboardingWrapper 
-          userId={user.id} 
-          onComplete={handleOnboardingComplete}
-        />
+        {/* Nav */}
+        <nav className="app-nav">
+          <span className="nav-brand">◈ BerkLink</span>
+          <div className="nav-links">
+            <button
+              className={`nav-btn ${page === 'onboarding' ? 'active' : ''}`}
+              onClick={() => setPage('onboarding')}
+            >
+              My Profile
+            </button>
+            <button
+              className={`nav-btn ${page === 'mygroup' ? 'active' : ''}`}
+              onClick={() => setPage('mygroup')}
+            >
+              My Groups
+            </button>
+            <button className="nav-btn signout" onClick={() => supabase.auth.signOut()}>
+              Sign Out
+            </button>
+          </div>
+        </nav>
+
+        {/* Page Content */}
+        {page === 'onboarding' ? (
+          <OnboardingWrapper
+            userId={user.id}
+            onComplete={handleOnboardingComplete}
+          />
+        ) : (
+          <MyGroup userId={user.id} />
+        )}
       </div>
     );
   }
 
-  // Otherwise show login/signup forms
   return (
     <div className="App">
       {isLogin ? (
