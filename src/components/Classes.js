@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { saveOnboardingStep } from '../services/onboardingService';
 import '../styles/Classes.css';
 
@@ -18,82 +18,51 @@ export default function Classes({ userId, onNext, onSkip }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Toggle default class selection
   const toggleDefaultClass = (className) => {
-    setSelectedClasses((prev) => {
-      if (prev.includes(className)) {
-        return prev.filter((c) => c !== className);
-      } else {
-        return [...prev, className];
-      }
-    });
+    setSelectedClasses((prev) =>
+      prev.includes(className) ? prev.filter((c) => c !== className) : [...prev, className]
+    );
   };
 
-  // Add custom class
   const addCustomClass = (e) => {
     e.preventDefault();
     const trimmedClass = customClass.trim().toUpperCase();
-
-    if (!trimmedClass) {
-      setError('Please enter a class name');
-      return;
+    if (!trimmedClass) { setError('Please enter a class name'); return; }
+    if (selectedClasses.includes(trimmedClass) || customClasses.includes(trimmedClass)) {
+      setError('This class is already added'); setCustomClass(''); return;
     }
-
-    // Check if class already exists
-    if (
-      selectedClasses.includes(trimmedClass) ||
-      customClasses.includes(trimmedClass)
-    ) {
-      setError('This class is already added');
-      setCustomClass('');
-      return;
-    }
-
-    // Check if it's a default class
     if (DEFAULT_CLASSES.includes(trimmedClass)) {
       setError('This class is already in the list. Please select it from above.');
-      setCustomClass('');
-      return;
+      setCustomClass(''); return;
     }
-
     setCustomClasses([...customClasses, trimmedClass]);
     setSelectedClasses([...selectedClasses, trimmedClass]);
     setCustomClass('');
     setError('');
   };
 
-  // Remove custom class
   const removeCustomClass = (className) => {
     setCustomClasses(customClasses.filter((c) => c !== className));
     setSelectedClasses(selectedClasses.filter((c) => c !== className));
   };
 
-  const hasSelection = () => {
-    return selectedClasses.length > 0;
-  };
+  const hasSelection = () => selectedClasses.length > 0;
 
   const handleNext = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (!hasSelection()) {
-      setError('Please select at least one class');
-      return;
-    }
-
+    if (!hasSelection()) { setError('Please select at least one class'); return; }
     setLoading(true);
 
     try {
+      // ✅ Save classes as a plain array — column is now jsonb, no JSON.stringify needed
       const savedData = await saveOnboardingStep(userId, {
         classes: selectedClasses,
       });
 
       if (savedData) {
         setSuccess(true);
-
-        if (onNext) {
-          onNext(savedData);
-        }
+        if (onNext) onNext(savedData);
       }
     } catch (err) {
       setError(err.message || 'An unexpected error occurred. Please try again.');
@@ -103,11 +72,7 @@ export default function Classes({ userId, onNext, onSkip }) {
     }
   };
 
-  const handleSkip = () => {
-    if (onSkip) {
-      onSkip();
-    }
-  };
+  const handleSkip = () => { if (onSkip) onSkip(); };
 
   return (
     <div className="classes-container">
@@ -132,7 +97,7 @@ export default function Classes({ userId, onNext, onSkip }) {
         )}
 
         <form onSubmit={handleNext}>
-          {/* Default Classes Section */}
+          {/* Default Classes */}
           <div className="classes-section">
             <h3 className="section-title">Popular Classes</h3>
             <div className="classes-grid">
@@ -140,28 +105,21 @@ export default function Classes({ userId, onNext, onSkip }) {
                 <button
                   key={className}
                   type="button"
-                  className={`class-button ${
-                    selectedClasses.includes(className) ? 'selected' : ''
-                  }`}
+                  className={`class-button ${selectedClasses.includes(className) ? 'selected' : ''}`}
                   onClick={() => toggleDefaultClass(className)}
                   disabled={loading}
                 >
-                  <span className="class-checkbox">
-                    {selectedClasses.includes(className) ? '✓' : ''}
-                  </span>
+                  <span className="class-checkbox">{selectedClasses.includes(className) ? '✓' : ''}</span>
                   <span className="class-name">{className}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Custom Class Input Section */}
+          {/* Custom Class Input */}
           <div className="classes-section">
             <h3 className="section-title">Add Custom Class</h3>
-            <p className="section-subtitle">
-              Don't see your class? Add it manually below
-            </p>
-
+            <p className="section-subtitle">Don't see your class? Add it manually below</p>
             <div className="custom-class-form">
               <input
                 type="text"
@@ -182,26 +140,19 @@ export default function Classes({ userId, onNext, onSkip }) {
               </button>
             </div>
 
-            {/* Custom Classes List */}
             {customClasses.length > 0 && (
               <div className="custom-classes-list">
                 <h4 className="custom-classes-title">Your Custom Classes</h4>
                 <div className="custom-classes-grid">
                   {customClasses.map((className) => (
-                    <div
-                      key={className}
-                      className="custom-class-tag"
-                    >
+                    <div key={className} className="custom-class-tag">
                       <span className="custom-class-text">{className}</span>
                       <button
                         type="button"
                         onClick={() => removeCustomClass(className)}
                         className="custom-class-remove"
                         disabled={loading}
-                        title="Remove class"
-                      >
-                        ×
-                      </button>
+                      >×</button>
                     </div>
                   ))}
                 </div>
@@ -209,7 +160,7 @@ export default function Classes({ userId, onNext, onSkip }) {
             )}
           </div>
 
-          {/* Selection Summary */}
+          {/* Summary */}
           {hasSelection() && (
             <div className="selection-summary">
               <p className="summary-text">
@@ -217,29 +168,17 @@ export default function Classes({ userId, onNext, onSkip }) {
               </p>
               <div className="selected-classes-display">
                 {selectedClasses.map((className) => (
-                  <span key={className} className="class-tag">
-                    {className}
-                  </span>
+                  <span key={className} className="class-tag">{className}</span>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="button-group">
-            <button
-              type="submit"
-              disabled={loading}
-              className="next-button"
-            >
+            <button type="submit" disabled={loading} className="next-button">
               {loading ? 'Saving...' : 'Next'}
             </button>
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={loading}
-              className="skip-button"
-            >
+            <button type="button" onClick={handleSkip} disabled={loading} className="skip-button">
               Skip for Now
             </button>
           </div>
@@ -247,9 +186,7 @@ export default function Classes({ userId, onNext, onSkip }) {
 
         <div className="info-note">
           <span className="note-icon">ℹ</span>
-          <p>
-            Your classes help us match you with other students taking the same courses for better study group compatibility.
-          </p>
+          <p>Your classes help us match you with other students taking the same courses.</p>
         </div>
       </div>
     </div>
