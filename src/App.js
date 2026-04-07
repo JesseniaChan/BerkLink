@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
+import ProfilePage from './components/ProfilePage';
 import MyGroup from './components/MyGroup';
 
 function App() {
@@ -49,13 +50,13 @@ function App() {
     // Consider profile complete if they have instagram AND at least one class
     const complete = data && data.instagram && data.classes && data.classes.length > 0;
     setHasProfile(complete);
-    if (complete) setPage('mygroup');
+    setPage((currentPage) => (complete && currentPage !== 'profile' ? 'mygroup' : currentPage));
     setLoading(false);
   }
 
-  const handleOnboardingComplete = () => {
+  const handleOnboardingComplete = (redirectPage = 'mygroup') => {
     setHasProfile(true);
-    setPage('mygroup');
+    setPage(redirectPage);
   };
 
   if (loading) {
@@ -73,8 +74,8 @@ function App() {
           <span className="nav-brand">◈ BerkLink</span>
           <div className="nav-links">
             <button
-              className={`nav-btn ${page === 'onboarding' ? 'active' : ''}`}
-              onClick={() => setPage('onboarding')}
+              className={`nav-btn ${page === 'profile' ? 'active' : ''}`}
+              onClick={() => setPage('profile')}
             >
               My Profile
             </button>
@@ -90,10 +91,19 @@ function App() {
           </div>
         </nav>
 
-        {page === 'onboarding' ? (
+        {page === 'profile' ? (
+          hasProfile ? (
+            <ProfilePage userId={user.id} onProfileUpdated={() => checkProfile(user.id)} />
+          ) : (
+            <OnboardingWrapper
+              userId={user.id}
+              onComplete={() => handleOnboardingComplete('profile')}
+            />
+          )
+        ) : page === 'onboarding' ? (
           <OnboardingWrapper
             userId={user.id}
-            onComplete={handleOnboardingComplete}
+            onComplete={() => handleOnboardingComplete('mygroup')}
           />
         ) : (
           <MyGroup userId={user.id} />
