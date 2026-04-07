@@ -10,27 +10,51 @@ function App() {
   const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [onboardingDone, setOnboardingDone] = useState(false);
-  const [page, setPage] = useState('onboarding'); // 'onboarding' | 'mygroup'
+  const [hasProfile, setHasProfile] = useState(false);
+  const [page, setPage] = useState('onboarding');
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
-    checkUser();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        checkProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          checkProfile(session.user.id);
+        } else {
+          setUser(null);
+          setHasProfile(false);
+          setLoading(false);
+        }
       }
     );
+
     return () => subscription?.unsubscribe();
   }, []);
 
+  async function checkProfile(userId) {
+    const { data } = await supabase
+      .from('students')
+      .select('user_id, instagram, classes, availability_dates')
+      .eq('user_id', userId)
+      .single();
+
+    // Consider profile complete if they have instagram AND at least one class
+    const complete = data && data.instagram && data.classes && data.classes.length > 0;
+    setHasProfile(complete);
+    if (complete) setPage('mygroup');
+    setLoading(false);
+  }
+
   const handleOnboardingComplete = () => {
-    setOnboardingDone(true);
+    setHasProfile(true);
     setPage('mygroup');
   };
 
@@ -45,7 +69,6 @@ function App() {
   if (user) {
     return (
       <div className="App">
-        {/* Nav */}
         <nav className="app-nav">
           <span className="nav-brand">◈ BerkLink</span>
           <div className="nav-links">
@@ -67,7 +90,6 @@ function App() {
           </div>
         </nav>
 
-        {/* Page Content */}
         {page === 'onboarding' ? (
           <OnboardingWrapper
             userId={user.id}
