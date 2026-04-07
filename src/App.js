@@ -4,36 +4,58 @@ import { supabase } from './supabaseClient';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
+import MyGroup from './components/MyGroup';
 
 function App() {
   const [isLogin, setIsLogin] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [page, setPage] = useState('onboarding');
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        checkProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
 
-    checkUser();
-
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user || null);
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          checkProfile(session.user.id);
+        } else {
+          setUser(null);
+          setHasProfile(false);
+          setLoading(false);
+        }
       }
     );
 
     return () => subscription?.unsubscribe();
   }, []);
 
+  async function checkProfile(userId) {
+    const { data } = await supabase
+      .from('students')
+      .select('user_id, instagram, classes, availability_dates')
+      .eq('user_id', userId)
+      .single();
+
+    // Consider profile complete if they have instagram AND at least one class
+    const complete = data && data.instagram && data.classes && data.classes.length > 0;
+    setHasProfile(complete);
+    if (complete) setPage('mygroup');
+    setLoading(false);
+  }
+
   const handleOnboardingComplete = () => {
-    console.log('Onboarding completed for user:', user.id);
-    // Redirect to dashboard or home page
-    // window.location.href = '/dashboard';
+    setHasProfile(true);
+    setPage('mygroup');
   };
 
   if (loading) {
@@ -44,19 +66,42 @@ function App() {
     );
   }
 
-  // If user is logged in, show onboarding flow
   if (user) {
     return (
       <div className="App">
-        <OnboardingWrapper 
-          userId={user.id} 
-          onComplete={handleOnboardingComplete}
-        />
+        <nav className="app-nav">
+          <span className="nav-brand">◈ BerkLink</span>
+          <div className="nav-links">
+            <button
+              className={`nav-btn ${page === 'onboarding' ? 'active' : ''}`}
+              onClick={() => setPage('onboarding')}
+            >
+              My Profile
+            </button>
+            <button
+              className={`nav-btn ${page === 'mygroup' ? 'active' : ''}`}
+              onClick={() => setPage('mygroup')}
+            >
+              My Groups
+            </button>
+            <button className="nav-btn signout" onClick={() => supabase.auth.signOut()}>
+              Sign Out
+            </button>
+          </div>
+        </nav>
+
+        {page === 'onboarding' ? (
+          <OnboardingWrapper
+            userId={user.id}
+            onComplete={handleOnboardingComplete}
+          />
+        ) : (
+          <MyGroup userId={user.id} />
+        )}
       </div>
     );
   }
 
-  // Otherwise show login/signup forms
   return (
     <div className="App">
       {isLogin ? (

@@ -1,0 +1,336 @@
+/* MyGroup.css */
+
+.mygroup-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.mygroup-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.mygroup-header h2 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.mygroup-header p {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.run-matcher-btn {
+  background: #3b82f6;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 24px;
+  transition: background 0.15s;
+}
+
+.run-matcher-btn:hover { background: #2563eb; }
+.run-matcher-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+}
+
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-state h3 { font-size: 1.2rem; color: #111; margin-bottom: 0.5rem; }
+
+/* Groups */
+.groups-list { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.group-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.group-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.group-badge {
+  display: inline-block;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+}
+
+.group-meta {
+  display: flex;
+  gap: 14px;
+  color: #6b7280;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.leave-btn {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+  transition: all 0.15s;
+}
+
+.leave-btn:hover { border-color: #ef4444; color: #ef4444; }
+
+/* Members grid */
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1px;
+  background: #e5e7eb;
+}
+
+.member-card {
+  background: #fff;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.member-card:hover:not(.is-you) { background: #f0f7ff; }
+.member-card.is-you { background: #fafafa; cursor: default; }
+
+.member-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #dbeafe;
+  border: 2px solid #93c5fd;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.member-card.is-you .member-avatar {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+.you-badge {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #16a34a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.member-handle {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111;
+}
+
+.member-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.mini-class-tag {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  color: #2563eb;
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.view-profile-hint {
+  color: #3b82f6;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+/* ── Profile Modal ─────────────────────────────────────── */
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.profile-modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover { background: #e5e7eb; color: #111; }
+
+.modal-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #dbeafe;
+  border: 3px solid #93c5fd;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 auto 1rem;
+}
+
+.modal-name {
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #111;
+}
+
+.modal-section {
+  margin-bottom: 1.5rem;
+}
+
+.modal-section h4 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modal-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  transition: background 0.15s;
+}
+
+.modal-link.instagram { background: #fdf2f8; color: #9333ea; }
+.modal-link.instagram:hover { background: #fae8ff; }
+.modal-link.phone { background: #f0fdf4; color: #16a34a; }
+.modal-link.phone:hover { background: #dcfce7; }
+
+.modal-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modal-class-tag {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+
+.modal-avail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.modal-avail-date {
+  font-weight: 600;
+  font-size: 13px;
+  color: #111;
+}
+
+.modal-avail-times {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Toast */
+.toast-message {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #111;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 20px;
+  z-index: 999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}

@@ -18,28 +18,17 @@ const TIME_SLOTS = [
   '8:00 PM',
 ];
 
-// Time zones for inclusivity (PST/PDT, MST/MDT, CST/CDT, EST/EDT)
 const TIME_ZONES = [
-  { label: 'Pacific (PT)', abbr: 'PT', offset: -7 }, // PDT
-  { label: 'Mountain (MT)', abbr: 'MT', offset: -6 }, // MDT
-  { label: 'Central (CT)', abbr: 'CT', offset: -5 }, // CDT
-  { label: 'Eastern (ET)', abbr: 'ET', offset: -4 }, // EDT
+  { label: 'Pacific (PT)', abbr: 'PT', offset: -7 },
+  { label: 'Mountain (MT)', abbr: 'MT', offset: -6 },
+  { label: 'Central (CT)', abbr: 'CT', offset: -5 },
+  { label: 'Eastern (ET)', abbr: 'ET', offset: -4 },
 ];
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 export default function Availability({ userId, onNext, onSkip }) {
@@ -50,36 +39,6 @@ export default function Availability({ userId, onNext, onSkip }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Get calendar days for current month
-  const convertTimeToTimeZone = (timeStr, toTimeZone) => {
-    // Parse the time string (e.g., "8:00 AM")
-    const [time, period] = timeStr.split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
-
-    // Convert to 24-hour format
-    if (period === 'PM' && hours !== 12) {
-      hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      hours = 0;
-    }
-
-    // Get the target time zone offset
-    const currentTZ = TIME_ZONES.find((tz) => tz.abbr === selectedTimeZone);
-    const targetTZ = TIME_ZONES.find((tz) => tz.abbr === toTimeZone);
-    const offsetDiff = targetTZ.offset - currentTZ.offset;
-
-    // Adjust hours
-    let newHours = hours + offsetDiff;
-    if (newHours < 0) newHours += 24;
-    if (newHours >= 24) newHours -= 24;
-
-    // Convert back to 12-hour format
-    const newPeriod = newHours >= 12 ? 'PM' : 'AM';
-    const displayHours = newHours % 12 === 0 ? 12 : newHours % 12;
-
-    return `${displayHours}:${String(minutes).padStart(2, '0')} ${newPeriod}`;
-  };
-
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -89,23 +48,19 @@ export default function Availability({ userId, onNext, onSkip }) {
   };
 
   const formatDateKey = (date) => {
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    return date.toISOString().split('T')[0];
   };
 
   const toggleDate = (day) => {
     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     const dateKey = formatDateKey(dateObj);
-
     setSelectedDates((prev) => {
       if (prev[dateKey]) {
         const newDates = { ...prev };
         delete newDates[dateKey];
         return newDates;
       } else {
-        return {
-          ...prev,
-          [dateKey]: [],
-        };
+        return { ...prev, [dateKey]: [] };
       }
     });
   };
@@ -114,7 +69,6 @@ export default function Availability({ userId, onNext, onSkip }) {
     setSelectedDates((prev) => {
       const times = prev[dateKey] || [];
       const isSelected = times.includes(time);
-
       return {
         ...prev,
         [dateKey]: isSelected ? times.filter((t) => t !== time) : [...times, time],
@@ -122,9 +76,7 @@ export default function Availability({ userId, onNext, onSkip }) {
     });
   };
 
-  const hasSelection = () => {
-    return Object.keys(selectedDates).length > 0;
-  };
+  const hasSelection = () => Object.keys(selectedDates).length > 0;
 
   const getSelectedDateDisplay = () => {
     return Object.keys(selectedDates)
@@ -140,27 +92,18 @@ export default function Availability({ userId, onNext, onSkip }) {
   };
 
   const previousMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-    );
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
   const nextMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
-    );
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
-
   const calendarDays = [];
-  for (let i = 0; i < firstDay; i++) {
-    calendarDays.push(null);
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    calendarDays.push(i);
-  }
+  for (let i = 0; i < firstDay; i++) calendarDays.push(null);
+  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
 
   const handleNext = async (e) => {
     e.preventDefault();
@@ -174,23 +117,14 @@ export default function Availability({ userId, onNext, onSkip }) {
     setLoading(true);
 
     try {
-      // Format availability data
-      const availabilityData = {};
-      Object.entries(selectedDates).forEach(([dateKey, times]) => {
-        availabilityData[dateKey] = times;
-      });
-
+      // ✅ Only save availability_dates — selected_dates column has been removed
       const savedData = await saveOnboardingStep(userId, {
-        availability_dates: availabilityData,
-        selected_dates: Object.keys(selectedDates),
+        availability_dates: selectedDates,
       });
 
       if (savedData) {
         setSuccess(true);
-
-        if (onNext) {
-          onNext(savedData);
-        }
+        if (onNext) onNext(savedData);
       }
     } catch (err) {
       setError(err.message || 'An unexpected error occurred. Please try again.');
@@ -201,9 +135,7 @@ export default function Availability({ userId, onNext, onSkip }) {
   };
 
   const handleSkip = () => {
-    if (onSkip) {
-      onSkip();
-    }
+    if (onSkip) onSkip();
   };
 
   return (
@@ -233,58 +165,27 @@ export default function Availability({ userId, onNext, onSkip }) {
             {/* LEFT: Calendar */}
             <div className="calendar-panel">
               <div className="calendar-section">
-                {/* Calendar Navigation */}
                 <div className="calendar-header">
-                  <button
-                    type="button"
-                    onClick={previousMonth}
-                    className="month-nav-button"
-                    disabled={loading}
-                  >
-                    ←
-                  </button>
+                  <button type="button" onClick={previousMonth} className="month-nav-button" disabled={loading}>←</button>
                   <h3 className="month-year-title">
                     {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={nextMonth}
-                    className="month-nav-button"
-                    disabled={loading}
-                  >
-                    →
-                  </button>
+                  <button type="button" onClick={nextMonth} className="month-nav-button" disabled={loading}>→</button>
                 </div>
 
-                {/* Calendar Grid */}
                 <div className="calendar-wrapper">
-                  {/* Day headers */}
                   <div className="calendar-grid">
                     {DAYS_OF_WEEK.map((day) => (
-                      <div key={day} className="calendar-day-header">
-                        {day}
-                      </div>
+                      <div key={day} className="calendar-day-header">{day}</div>
                     ))}
-
-                    {/* Calendar days */}
                     {calendarDays.map((day, index) => {
-                      const dateKey =
-                        day !== null
-                          ? formatDateKey(
-                              new Date(
-                                currentDate.getFullYear(),
-                                currentDate.getMonth(),
-                                day
-                              )
-                            )
-                          : null;
-
+                      const dateKey = day !== null
+                        ? formatDateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))
+                        : null;
                       return (
                         <div
                           key={index}
-                          className={`calendar-day ${
-                            day === null ? 'empty' : ''
-                          } ${dateKey && selectedDates[dateKey] ? 'selected' : ''}`}
+                          className={`calendar-day ${day === null ? 'empty' : ''} ${dateKey && selectedDates[dateKey] ? 'selected' : ''}`}
                           onClick={() => day !== null && toggleDate(day)}
                           role="button"
                           tabIndex={0}
@@ -298,7 +199,7 @@ export default function Availability({ userId, onNext, onSkip }) {
               </div>
             </div>
 
-            {/* RIGHT: Time Slots with Time Zones */}
+            {/* RIGHT: Time Slots */}
             <div className="time-zones-panel">
               {!hasSelection() ? (
                 <div className="timezone-placeholder">
@@ -306,7 +207,6 @@ export default function Availability({ userId, onNext, onSkip }) {
                 </div>
               ) : (
                 <>
-                  {/* Time Zone Selector */}
                   <div className="timezone-selector-group">
                     <label htmlFor="timezone-select" className="timezone-label">
                       Select your time zone:
@@ -319,19 +219,15 @@ export default function Availability({ userId, onNext, onSkip }) {
                       disabled={loading}
                     >
                       {TIME_ZONES.map((tz) => (
-                        <option key={tz.abbr} value={tz.abbr}>
-                          {tz.label}
-                        </option>
+                        <option key={tz.abbr} value={tz.abbr}>{tz.label}</option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Time Slots for Selected Time Zone Only */}
                   <div className="time-slots-container">
                     <h4 className="time-slots-title">
                       Available times for {getSelectedDateDisplay()}
                     </h4>
-
                     <div className="timezone-time-slots">
                       <div className="timezone-header">
                         <h5 className="timezone-time">
@@ -340,10 +236,7 @@ export default function Availability({ userId, onNext, onSkip }) {
                       </div>
                       <div className="time-slots-grid">
                         {TIME_SLOTS.map((time) => (
-                          <label
-                            key={`${selectedTimeZone}-${time}`}
-                            className="time-slot-checkbox"
-                          >
+                          <label key={`${selectedTimeZone}-${time}`} className="time-slot-checkbox">
                             <input
                               type="checkbox"
                               onChange={() => {
@@ -379,19 +272,10 @@ export default function Availability({ userId, onNext, onSkip }) {
           )}
 
           <div className="button-group">
-            <button
-              type="submit"
-              disabled={loading}
-              className="next-button"
-            >
+            <button type="submit" disabled={loading} className="next-button">
               {loading ? 'Saving...' : 'Next'}
             </button>
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={loading}
-              className="skip-button"
-            >
+            <button type="button" onClick={handleSkip} disabled={loading} className="skip-button">
               Skip for Now
             </button>
           </div>
@@ -399,9 +283,7 @@ export default function Availability({ userId, onNext, onSkip }) {
 
         <div className="info-note">
           <span className="note-icon">ℹ</span>
-          <p>
-            Click on dates to select them, then choose your available time slots. You can update your availability anytime.
-          </p>
+          <p>Click on dates to select them, then choose your available time slots. You can update your availability anytime.</p>
         </div>
       </div>
     </div>
