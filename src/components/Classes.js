@@ -55,7 +55,6 @@ export default function Classes({ userId, onNext, onSkip }) {
     setLoading(true);
 
     try {
-      // ✅ Save classes as a plain array — column is now jsonb, no JSON.stringify needed
       const savedData = await saveOnboardingStep(userId, {
         classes: selectedClasses,
       });
