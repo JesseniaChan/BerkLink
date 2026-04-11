@@ -4,11 +4,13 @@ import '../styles/Classes.css';
 
 const DEFAULT_CLASSES = [
   'CS61A',
-  'Data8',
-  'Math54',
-  'Math52',
-  'Data100',
+  'DATA8',
+  'MATH54',
+  'MATH52',
+  'DATA100',
 ];
+
+const normalizeClassName = (value = '') => value.replace(/\s+/g, '').toUpperCase().trim();
 
 export default function Classes({ userId, onNext, onSkip }) {
   const [selectedClasses, setSelectedClasses] = useState([]);
@@ -26,7 +28,7 @@ export default function Classes({ userId, onNext, onSkip }) {
 
   const addCustomClass = (e) => {
     e.preventDefault();
-    const trimmedClass = customClass.trim().toUpperCase();
+    const trimmedClass = normalizeClassName(customClass);
     if (!trimmedClass) { setError('Please enter a class name'); return; }
     if (selectedClasses.includes(trimmedClass) || customClasses.includes(trimmedClass)) {
       setError('This class is already added'); setCustomClass(''); return;
@@ -124,7 +126,10 @@ export default function Classes({ userId, onNext, onSkip }) {
                 type="text"
                 placeholder="Enter class name or code (e.g., CS170, PHYS7A)"
                 value={customClass}
-                onChange={(e) => setCustomClass(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setCustomClass(normalizeClassName(e.target.value));
+                  setError('');
+                }}
                 disabled={loading}
                 className="custom-class-input"
                 maxLength={50}
