@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { connectGoogleCalendar, createGoogleCalendarEvent } from '../services/googleCalendarService';
 import '../styles/MyGroup.css';
@@ -11,9 +11,7 @@ export default function MyGroup({ userId }) {
   const [selectedMember, setSelectedMember] = useState(null); // for profile modal
   const [calendarStatus, setCalendarStatus] = useState({});
 
-  useEffect(() => { fetchMyGroups(); }, []);
-
-  async function fetchMyGroups() {
+  const fetchMyGroups = useCallback(async () => {
     setLoading(true);
 
     const { data: memberships } = await supabase
@@ -58,7 +56,9 @@ export default function MyGroup({ userId }) {
 
     setGroups(enriched);
     setLoading(false);
-  }
+  }, [userId]);
+
+  useEffect(() => { fetchMyGroups(); }, [fetchMyGroups]);
 
   async function runMatcher() {
     setRunning(true);
@@ -82,7 +82,7 @@ export default function MyGroup({ userId }) {
     return { start, end };
   }
 
-  async function createCalendarEventForGroup(group, storageKey) {
+  const createCalendarEventForGroup = useCallback(async (group, storageKey) => {
     if (!group.matched_availability || group.matched_availability.length === 0) return;
 
     const [match] = group.matched_availability;
@@ -120,7 +120,7 @@ export default function MyGroup({ userId }) {
       }));
       console.error('Calendar event creation error:', err);
     }
-  }
+  }, []);
 
   useEffect(() => {
     groups.forEach((group) => {
@@ -133,7 +133,7 @@ export default function MyGroup({ userId }) {
 
       createCalendarEventForGroup(group, storageKey);
     });
-  }, [groups, userId]);
+  }, [createCalendarEventForGroup, groups, userId]);
 
   async function leaveGroup(groupId) {
     await supabase
