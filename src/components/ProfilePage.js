@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getOnboardingData, saveOnboardingStep } from '../services/onboardingService';
+import { connectGoogleCalendar } from '../services/googleCalendarService';
 import '../styles/ProfilePage.css';
 
 const DEFAULT_CLASSES = [
@@ -86,6 +87,7 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -93,6 +95,7 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
         setLoading(true);
         const savedData = await getOnboardingData(userId);
         setProfile(savedData);
+        setGoogleConnected(!!savedData?.google_calendar_connected);
       } catch (err) {
         console.error('Error loading profile:', err);
       } finally {
@@ -151,6 +154,35 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   const removeCustomClass = (className) => {
     setCustomClasses((prev) => prev.filter((c) => c !== className));
     setSelectedClasses((prev) => prev.filter((c) => c !== className));
+  };
+
+  const handleConnectGoogleCalendar = async () => {
+    setError('');
+    setSuccess('');
+
+    try {
+      setSaving(true);
+      await connectGoogleCalendar();
+      const savedData = await saveOnboardingStep(userId, {
+        google_calendar_connected: true,
+      });
+      setProfile(savedData);
+      setGoogleConnected(true);
+      setSuccess('Google Calendar connected successfully. You can now sync matched groups to your calendar.');
+      if (typeof onProfileUpdated === 'function') {
+        onProfileUpdated();
+      }
+    } catch (err) {
+      const message =
+        err?.error_description ||
+        err?.result?.error?.message ||
+        err?.message ||
+        'Unable to connect Google Calendar. Please try again.';
+      setError(message);
+      console.error('Google Calendar connection error:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -274,6 +306,20 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
             <div className="profile-field">
               <span className="field-label">Phone</span>
               <span className="field-value">{profile?.phone ? formatPhone(profile.phone) : 'Not set'}</span>
+            </div>
+            <div className="profile-field">
+              <span className="field-label">Calendar Sync</span>
+              <div className="field-value">
+                <span>{googleConnected ? 'Connected to Google Calendar' : 'Not connected'}</span>
+                <button
+                  type="button"
+                  className="connect-calendar-button"
+                  onClick={handleConnectGoogleCalendar}
+                  disabled={saving}
+                >
+                  {googleConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+                </button>
+              </div>
             </div>
             <div className="profile-field">
               <span className="field-label">Classes</span>
