@@ -7,7 +7,7 @@ export default function StudentInfo({ userId, onNext, onSkip }) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [, setSuccess] = useState(false);
   const [touched, setTouched] = useState({ instagram: false, phone: false });
 
   const validateInstagram = (value) => {

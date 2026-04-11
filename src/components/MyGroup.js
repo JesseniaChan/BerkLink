@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { connectGoogleCalendar, createGoogleCalendarEvent } from '../services/googleCalendarService';
 import '../styles/MyGroup.css';
 
 export default function MyGroup({ userId }) {
@@ -8,6 +9,7 @@ export default function MyGroup({ userId }) {
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState('');
   const [selectedMember, setSelectedMember] = useState(null); // for profile modal
+  const [calendarStatus, setCalendarStatus] = useState({});
 
   useEffect(() => { fetchMyGroups(); }, []);
 
@@ -43,10 +45,14 @@ export default function MyGroup({ userId }) {
 
         const { data: studentDetails } = await supabase
           .from('students')
-          .select('user_id, instagram, phone, classes, availability_dates')
+          .select('user_id, instagram, phone, classes, availability_dates, google_calendar_connected')
           .in('user_id', memberIds);
 
-        return { ...group, members: studentDetails || [] };
+        return {
+          ...group,
+          members: studentDetails || [],
+          matched_availability: getSharedAvailability(studentDetails || []),
+        };
       })
     );
 
@@ -61,6 +67,73 @@ export default function MyGroup({ userId }) {
     if (error) showToast('Error: ' + error.message);
     else { showToast('Groups updated!'); fetchMyGroups(); }
   }
+
+  function getEventStartEnd(dateKey, timeSlot) {
+    const [timePart, meridiem] = timeSlot.split(' ');
+    const [hourString, minuteString] = timePart.split(':');
+    let hour = Number(hourString);
+    const minute = Number(minuteString);
+
+    if (meridiem === 'PM' && hour !== 12) hour += 12;
+    if (meridiem === 'AM' && hour === 12) hour = 0;
+
+    const start = new Date(`${dateKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    return { start, end };
+  }
+
+  async function createCalendarEventForGroup(group, storageKey) {
+    if (!group.matched_availability || group.matched_availability.length === 0) return;
+
+    const [match] = group.matched_availability;
+    if (!match?.times || match.times.length === 0) return;
+
+    setCalendarStatus((prev) => ({
+      ...prev,
+      [group.id]: { loading: true, message: 'Creating calendar event…' },
+    }));
+
+    try {
+      await connectGoogleCalendar();
+      const { start, end } = getEventStartEnd(match.date, match.times[0]);
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      await createGoogleCalendarEvent({
+        summary: `Study group: ${group.class_code}`,
+        description: `Study group matched on ${match.date} at ${match.times[0]} with ${group.members.length} members.`,
+        startDateTime: start.toISOString(),
+        endDateTime: end.toISOString(),
+        timeZone,
+      });
+
+      const key = storageKey || `berklink_calendar_event_created_${group.id}`;
+      localStorage.setItem(key, 'true');
+
+      setCalendarStatus((prev) => ({
+        ...prev,
+        [group.id]: { loading: false, message: 'Added to Google Calendar' },
+      }));
+    } catch (err) {
+      setCalendarStatus((prev) => ({
+        ...prev,
+        [group.id]: { loading: false, message: err.message || 'Unable to create calendar event' },
+      }));
+      console.error('Calendar event creation error:', err);
+    }
+  }
+
+  useEffect(() => {
+    groups.forEach((group) => {
+      const currentMember = group.members.find((member) => member.user_id === userId);
+      if (!currentMember?.google_calendar_connected) return;
+      if (!group.matched_availability || group.matched_availability.length === 0) return;
+
+      const storageKey = `berklink_calendar_event_created_${group.id}`;
+      if (localStorage.getItem(storageKey)) return;
+
+      createCalendarEventForGroup(group, storageKey);
+    });
+  }, [groups, userId]);
 
   async function leaveGroup(groupId) {
     await supabase
@@ -83,6 +156,47 @@ export default function MyGroup({ userId }) {
         const d = new Date(date + 'T00:00:00');
         const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         return times.length > 0 ? `${label}: ${times.join(', ')}` : label;
+      })
+      .join(' · ');
+  }
+
+  function getSharedAvailability(members) {
+    if (!members || members.length === 0) return [];
+
+    const availabilities = members.map((member) => member.availability_dates || {});
+    if (availabilities.some((availability) => Object.keys(availability).length === 0)) {
+      return [];
+    }
+
+    const firstDates = Object.keys(availabilities[0]);
+    const shared = firstDates.reduce((acc, date) => {
+      const initialTimes = availabilities[0][date] || [];
+      if (initialTimes.length === 0) return acc;
+
+      const commonTimes = availabilities.slice(1).reduce((times, availability) => {
+        const nextTimes = availability[date] || [];
+        return times.filter((time) => nextTimes.includes(time));
+      }, initialTimes);
+
+      if (commonTimes.length > 0) {
+        acc.push({ date, times: commonTimes });
+      }
+      return acc;
+    }, []);
+
+    return shared;
+  }
+
+  function formatExactTimes(sharedAvailability) {
+    if (!sharedAvailability || sharedAvailability.length === 0) {
+      return 'No exact times matched yet';
+    }
+
+    return sharedAvailability
+      .map(({ date, times }) => {
+        const d = new Date(date + 'T00:00:00');
+        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        return `${label}: ${times.join(', ')}`;
       })
       .join(' · ');
   }
@@ -183,6 +297,23 @@ export default function MyGroup({ userId }) {
                     <span>📅 {group.day_of_week}</span>
                     <span>🕐 {group.time_slot}</span>
                     <span>👥 {group.members.length} members</span>
+                  </div>
+                  <div className="group-meta exact-times">
+                    <span>⏱ {formatExactTimes(group.matched_availability)}</span>
+                  </div>
+                  <div className="group-meta calendar-sync">
+                    {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
+                      <button
+                        className="sync-calendar-btn"
+                        type="button"
+                        onClick={() => createCalendarEventForGroup(group)}
+                        disabled={calendarStatus[group.id]?.loading}
+                      >
+                        {calendarStatus[group.id]?.loading ? 'Syncing…' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
+                      </button>
+                    ) : (
+                      <span className="calendar-sync-note">Connect Google Calendar from your profile to sync matched groups.</span>
+                    )}
                   </div>
                 </div>
                 <button className="leave-btn" onClick={() => leaveGroup(group.id)}>

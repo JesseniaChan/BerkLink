@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState} from 'react';
 import { saveOnboardingStep } from '../services/onboardingService';
 import '../styles/Availability.css';
 
