@@ -149,6 +149,7 @@ export default function MyGroup({ userId }) {
     setTimeout(() => setToast(''), 3000);
   }
 
+  // eslint-disable-next-line no-unused-vars
   function formatDates(availability_dates) {
     if (!availability_dates) return 'No availability set';
     return Object.entries(availability_dates)

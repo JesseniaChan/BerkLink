@@ -7,19 +7,12 @@ export default function StudentInfo({ userId, onNext, onSkip }) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [, setSuccess] = useState(false);
   const [touched, setTouched] = useState({ instagram: false, phone: false });
 
   const validateInstagram = (value) => {
     // Instagram handle validation: alphanumeric, dots, underscores
     const instagramRegex = /^[a-zA-Z0-9._]{3,30}$/;
     return instagramRegex.test(value);
-  };
-
-  const validatePhone = (value) => {
-    // Basic phone validation: removes non-digits for checking
-    const digitsOnly = value.replace(/\D/g, '');
-    return digitsOnly.length === 10;
   };
 
   const formatPhone = (value) => {
@@ -50,10 +43,6 @@ export default function StudentInfo({ userId, onNext, onSkip }) {
     setTouched({ ...touched, [field]: true });
   };
 
-  const isFormValid = () => {
-    return instagram.trim() !== '' && phone.replace(/\D/g, '').length === 10;
-  };
-
   const handleNext = async (e) => {
     e.preventDefault();
     setError('');
@@ -82,7 +71,6 @@ export default function StudentInfo({ userId, onNext, onSkip }) {
       });
 
       if (savedData) {
-        setSuccess(true);
         // Reset form
         setInstagram('');
         setPhone('');
