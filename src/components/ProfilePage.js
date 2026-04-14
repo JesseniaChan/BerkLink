@@ -5,10 +5,10 @@ import '../styles/ProfilePage.css';
 
 const DEFAULT_CLASSES = [
   'CS61A',
-  'Data8',
-  'Math54',
-  'Math52',
-  'Data100',
+  'DATA8',
+  'MATH54',
+  'MATH52',
+  'DATA100',
 ];
 
 const TIME_SLOTS = [
@@ -71,6 +71,8 @@ const validateInstagram = (value) => {
 };
 
 const validatePhone = (value) => normalizePhone(value).length === 10;
+const normalizeClassName = (value = '') => value.replace(/\s+/g, '').toUpperCase().trim();
+const normalizeClassList = (classes = []) => [...new Set(classes.map((className) => normalizeClassName(className)).filter(Boolean))];
 
 export default function ProfilePage({ userId, onProfileUpdated }) {
   const [profile, setProfile] = useState(null);
@@ -80,9 +82,9 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   const [phone, setPhone] = useState('');
   const [selectedClasses, setSelectedClasses] = useState([]);
   const [customClass, setCustomClass] = useState('');
-  const [customClasses, setCustomClasses] = useState([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState({});
+  const [activeDateKey, setActiveDateKey] = useState('');
   const [selectedTimeZone, setSelectedTimeZone] = useState('PT');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -112,25 +114,19 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
     if (profile && editMode) {
       setInstagram(profile.instagram || '');
       setPhone(formatPhone(profile.phone || ''));
-      const classes = Array.isArray(profile.classes) ? profile.classes : [];
+      const classes = normalizeClassList(Array.isArray(profile.classes) ? profile.classes : []);
       setSelectedClasses(classes);
-      setCustomClasses(classes.filter((className) => !DEFAULT_CLASSES.includes(className)));
       setSelectedDates(profile.availability_dates || {});
+      setActiveDateKey(Object.keys(profile.availability_dates || {})[0] || '');
       setSelectedTimeZone('PT');
       setError('');
       setSuccess('');
     }
   }, [profile, editMode]);
 
-  const handleToggleClass = (className) => {
-    setSelectedClasses((prev) =>
-      prev.includes(className) ? prev.filter((c) => c !== className) : [...prev, className]
-    );
-  };
-
   const addCustomClass = (e) => {
     e.preventDefault();
-    const trimmed = customClass.trim().toUpperCase();
+    const trimmed = normalizeClassName(customClass);
     if (!trimmed) {
       setError('Please enter a class name');
       return;
@@ -141,18 +137,16 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
       return;
     }
     if (DEFAULT_CLASSES.includes(trimmed)) {
-      setError('This class is already in the default list. Please select it above.');
+      setError('This class is already added.');
       setCustomClass('');
       return;
     }
     setSelectedClasses([...selectedClasses, trimmed]);
-    setCustomClasses([...customClasses, trimmed]);
     setCustomClass('');
     setError('');
   };
 
   const removeCustomClass = (className) => {
-    setCustomClasses((prev) => prev.filter((c) => c !== className));
     setSelectedClasses((prev) => prev.filter((c) => c !== className));
   };
 
@@ -192,11 +186,19 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     const dateKey = formatDateKey(dateObj);
     setSelectedDates((prev) => {
+      if (prev[dateKey] && activeDateKey !== dateKey) {
+        setActiveDateKey(dateKey);
+        return prev;
+      }
       if (prev[dateKey]) {
         const next = { ...prev };
         delete next[dateKey];
+        if (activeDateKey === dateKey) {
+          setActiveDateKey(Object.keys(next)[0] || '');
+        }
         return next;
       }
+      setActiveDateKey(dateKey);
       return { ...prev, [dateKey]: [] };
     });
   };
@@ -210,6 +212,8 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
       return { ...prev, [dateKey]: updatedTimes };
     });
   };
+
+  const activeDateLabel = activeDateKey ? formatDateLabel(activeDateKey) : '';
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -242,7 +246,7 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
       const savedData = await saveOnboardingStep(userId, {
         instagram: instagram.trim().toLowerCase(),
         phone: normalizePhone(phone),
-        classes: selectedClasses,
+        classes: normalizeClassList(selectedClasses),
         availability_dates: selectedDates,
       });
 
@@ -376,34 +380,24 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
             <div className="form-group">
               <label>Classes</label>
-              <div className="classes-grid">
-                {DEFAULT_CLASSES.map((className) => (
-                  <button
-                    key={className}
-                    type="button"
-                    className={`class-button ${selectedClasses.includes(className) ? 'selected' : ''}`}
-                    onClick={() => handleToggleClass(className)}
-                    disabled={saving}
-                  >
-                    {className}
-                  </button>
-                ))}
-              </div>
               <div className="custom-class-form">
                 <input
                   type="text"
                   placeholder="Add a class (e.g. CS170)"
                   value={customClass}
-                  onChange={(e) => setCustomClass(e.target.value)}
+                  onChange={(e) => {
+                    setCustomClass(normalizeClassName(e.target.value));
+                    setError('');
+                  }}
                   disabled={saving}
                 />
                 <button type="button" onClick={addCustomClass} disabled={saving || !customClass.trim()}>
                   Add
                 </button>
               </div>
-              {customClasses.length > 0 && (
+              {selectedClasses.length > 0 && (
                 <div className="custom-classes-list">
-                  {customClasses.map((className) => (
+                  {selectedClasses.map((className) => (
                     <div key={className} className="custom-class-tag">
                       <span>{className}</span>
                       <button type="button" onClick={() => removeCustomClass(className)} disabled={saving}>×</button>
@@ -437,7 +431,7 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
                         <button
                           key={index}
                           type="button"
-                          className={`calendar-day${isSelected ? ' selected' : ''}`}
+                          className={`calendar-day${isSelected ? ' selected' : ''}${activeDateKey === dateKey ? ' active' : ''}`}
                           onClick={() => toggleDate(dayNum)}
                           disabled={saving}
                         >
@@ -462,21 +456,26 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
                       ))}
                     </select>
                   </div>
-                  <div className="time-slots-grid">
-                    {TIME_SLOTS.map((time) => (
-                      <label key={time} className="time-slot-label">
-                        <input
-                          type="checkbox"
-                          checked={Object.keys(selectedDates).every((dateKey) => selectedDates[dateKey].includes(time)) && Object.keys(selectedDates).length > 0}
-                          onChange={() => {
-                            Object.keys(selectedDates).forEach((dateKey) => toggleTimeSlot(dateKey, time));
-                          }}
-                          disabled={saving || Object.keys(selectedDates).length === 0}
-                        />
-                        <span>{time}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {activeDateKey ? (
+                    <>
+                      <p>Editing time slots for {activeDateLabel}</p>
+                      <div className="time-slots-grid">
+                        {TIME_SLOTS.map((time) => (
+                          <label key={time} className="time-slot-label">
+                            <input
+                              type="checkbox"
+                              checked={(selectedDates[activeDateKey] || []).includes(time)}
+                              onChange={() => toggleTimeSlot(activeDateKey, time)}
+                              disabled={saving}
+                            />
+                            <span>{time}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p>Select a date to edit its time slots.</p>
+                  )}
                 </div>
               </div>
             </div>

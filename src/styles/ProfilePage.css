@@ -168,6 +168,7 @@
 
 .custom-class-form input {
   flex: 1;
+  text-transform: uppercase;
 }
 
 .custom-class-form button {
@@ -239,6 +240,10 @@
   background: #4338ca;
   color: #ffffff;
   border-color: #4338ca;
+}
+
+.calendar-day.active {
+  box-shadow: 0 0 0 3px rgba(30, 94, 216, 0.2);
 }
 
 .calendar-day.empty {
