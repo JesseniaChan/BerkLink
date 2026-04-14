@@ -26,6 +26,7 @@ const TIME_ZONES = [
 ];
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const FULL_DAYS_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -34,6 +35,7 @@ const MONTHS = [
 export default function Availability({ userId, onNext, onSkip }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState({});
+  const [activeDate, setActiveDate] = useState(null);
   const [selectedTimeZone, setSelectedTimeZone] = useState('PT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,15 +56,41 @@ export default function Availability({ userId, onNext, onSkip }) {
   const toggleDate = (day) => {
     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     const dateKey = formatDateKey(dateObj);
-    setSelectedDates((prev) => {
-      if (prev[dateKey]) {
+    if (selectedDates[dateKey] !== undefined) {
+      // deselecting
+      setSelectedDates((prev) => {
         const newDates = { ...prev };
         delete newDates[dateKey];
         return newDates;
-      } else {
-        return { ...prev, [dateKey]: [] };
+      });
+      setActiveDate((prev) => (prev === dateKey ? null : prev));
+    } else {
+      // selecting — also make it the active date
+      setSelectedDates((prev) => ({ ...prev, [dateKey]: [] }));
+      setActiveDate(dateKey);
+    }
+  };
+
+  const pasteTimesToWeekday = () => {
+    if (!activeDate || !(selectedDates[activeDate] || []).length) return;
+    const sourceTimes = selectedDates[activeDate];
+    const sourceWeekday = new Date(activeDate + 'T00:00:00').getDay();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const totalDays = getDaysInMonth(currentDate);
+    const updates = {};
+    for (let d = 1; d <= totalDays; d++) {
+      if (new Date(year, month, d).getDay() === sourceWeekday) {
+        updates[formatDateKey(new Date(year, month, d))] = [...sourceTimes];
       }
-    });
+    }
+    setSelectedDates((prev) => ({ ...prev, ...updates }));
+  };
+
+  const getPasteButtonLabel = () => {
+    if (!activeDate) return 'Paste times for all days';
+    const weekday = new Date(activeDate + 'T00:00:00').getDay();
+    return `Paste times for all ${FULL_DAYS_PLURAL[weekday]}`;
   };
 
   const toggleTimeSlot = (dateKey, time) => {
@@ -185,7 +213,7 @@ export default function Availability({ userId, onNext, onSkip }) {
                       return (
                         <div
                           key={index}
-                          className={`calendar-day ${day === null ? 'empty' : ''} ${dateKey && selectedDates[dateKey] ? 'selected' : ''}`}
+                          className={`calendar-day ${day === null ? 'empty' : ''} ${dateKey && selectedDates[dateKey] !== undefined ? 'selected' : ''} ${dateKey === activeDate ? 'active' : ''}`}
                           onClick={() => day !== null && toggleDate(day)}
                           role="button"
                           tabIndex={0}
@@ -201,9 +229,9 @@ export default function Availability({ userId, onNext, onSkip }) {
 
             {/* RIGHT: Time Slots */}
             <div className="time-zones-panel">
-              {!hasSelection() ? (
+              {!(activeDate && selectedDates[activeDate] !== undefined) ? (
                 <div className="timezone-placeholder">
-                  <p>Select dates on the left to view time slots</p>
+                  <p>{hasSelection() ? 'Click a selected date to edit its times' : 'Select a date on the left to view time slots'}</p>
                 </div>
               ) : (
                 <>
@@ -226,7 +254,10 @@ export default function Availability({ userId, onNext, onSkip }) {
 
                   <div className="time-slots-container">
                     <h4 className="time-slots-title">
-                      Available times for {getSelectedDateDisplay()}
+                      Available times for{' '}
+                      {new Date(activeDate + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'long', month: 'short', day: 'numeric',
+                      })}
                     </h4>
                     <div className="timezone-time-slots">
                       <div className="timezone-header">
@@ -239,11 +270,8 @@ export default function Availability({ userId, onNext, onSkip }) {
                           <label key={`${selectedTimeZone}-${time}`} className="time-slot-checkbox">
                             <input
                               type="checkbox"
-                              onChange={() => {
-                                Object.keys(selectedDates).forEach((dateKey) => {
-                                  toggleTimeSlot(dateKey, time);
-                                });
-                              }}
+                              checked={(selectedDates[activeDate] || []).includes(time)}
+                              onChange={() => toggleTimeSlot(activeDate, time)}
                               disabled={loading}
                             />
                             <span className="time-slot-display">{time}</span>
@@ -252,6 +280,17 @@ export default function Availability({ userId, onNext, onSkip }) {
                       </div>
                     </div>
                   </div>
+
+                  {(selectedDates[activeDate] || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={pasteTimesToWeekday}
+                      disabled={loading}
+                      className="paste-button"
+                    >
+                      {getPasteButtonLabel()}
+                    </button>
+                  )}
                 </>
               )}
             </div>

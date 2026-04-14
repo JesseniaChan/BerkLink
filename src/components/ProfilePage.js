@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getOnboardingData, saveOnboardingStep } from '../services/onboardingService';
 import { connectGoogleCalendar } from '../services/googleCalendarService';
 import '../styles/ProfilePage.css';
@@ -35,6 +35,7 @@ const TIME_ZONES = [
 ];
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const FULL_DAYS_PLURAL = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -90,6 +91,10 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [gridMode, setGridMode] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragActionRef = useRef(null);
+  const draggedCells = useRef(new Set());
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -214,6 +219,62 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   };
 
   const activeDateLabel = activeDateKey ? formatDateLabel(activeDateKey) : '';
+
+  const pasteTimesToWeekday = () => {
+    if (!activeDateKey || !(selectedDates[activeDateKey] || []).length) return;
+    const sourceTimes = selectedDates[activeDateKey];
+    const sourceWeekday = new Date(activeDateKey + 'T00:00:00').getDay();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const totalDays = getDaysInMonth(currentDate);
+    const updates = {};
+    for (let d = 1; d <= totalDays; d++) {
+      if (new Date(year, month, d).getDay() === sourceWeekday) {
+        updates[formatDateKey(new Date(year, month, d))] = [...sourceTimes];
+      }
+    }
+    setSelectedDates((prev) => ({ ...prev, ...updates }));
+  };
+
+  const getPasteButtonLabel = () => {
+    if (!activeDateKey) return 'Paste times for all days';
+    const weekday = new Date(activeDateKey + 'T00:00:00').getDay();
+    return `Paste times for all ${FULL_DAYS_PLURAL[weekday]}`;
+  };
+
+  const handleGridMouseDown = (dateKey, time) => {
+    const isCurrentlySelected = (selectedDates[dateKey] || []).includes(time);
+    isDraggingRef.current = true;
+    dragActionRef.current = isCurrentlySelected ? 'deselect' : 'select';
+    draggedCells.current = new Set([`${dateKey}_${time}`]);
+    toggleTimeSlot(dateKey, time);
+  };
+
+  const handleGridMouseEnter = (dateKey, time) => {
+    if (!isDraggingRef.current) return;
+    const cellKey = `${dateKey}_${time}`;
+    if (draggedCells.current.has(cellKey)) return;
+    draggedCells.current.add(cellKey);
+    setSelectedDates((prev) => {
+      const times = prev[dateKey] || [];
+      const isSelected = times.includes(time);
+      if (dragActionRef.current === 'select' && !isSelected) {
+        return { ...prev, [dateKey]: [...times, time] };
+      }
+      if (dragActionRef.current === 'deselect' && isSelected) {
+        return { ...prev, [dateKey]: times.filter((t) => t !== time) };
+      }
+      return prev;
+    });
+  };
+
+  useEffect(() => {
+    const stopDrag = () => { isDraggingRef.current = false; };
+    window.addEventListener('mouseup', stopDrag);
+    return () => window.removeEventListener('mouseup', stopDrag);
+  }, []);
+
+  const sortedDates = Object.keys(selectedDates).sort();
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -409,81 +470,143 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
             <div className="form-group availability-editor">
               <label>Availability</label>
-              <div className="availability-panel">
-                <div className="calendar-panel">
-                  <div className="calendar-header">
-                    <button type="button" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} disabled={saving}>←</button>
-                    <span>{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
-                    <button type="button" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} disabled={saving}>→</button>
-                  </div>
-                  <div className="calendar-grid">
-                    {DAYS_OF_WEEK.map((day) => (
-                      <div key={day} className="calendar-day-header">{day}</div>
-                    ))}
-                    {Array.from({ length: getFirstDayOfMonth(currentDate) }).map((_, index) => (
-                      <div key={`empty-${index}`} className="calendar-day empty" />
-                    ))}
-                    {Array.from({ length: getDaysInMonth(currentDate) }).map((_, index) => {
-                      const dayNum = index + 1;
-                      const dateKey = formatDateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum));
-                      const isSelected = !!selectedDates[dateKey];
-                      return (
-                        <button
-                          key={index}
-                          type="button"
-                          className={`calendar-day${isSelected ? ' selected' : ''}${activeDateKey === dateKey ? ' active' : ''}`}
-                          onClick={() => toggleDate(dayNum)}
-                          disabled={saving}
-                        >
-                          {dayNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                <div className="time-slot-panel">
-                  <div className="timezone-row">
-                    <label htmlFor="timezone-select">Time Zone</label>
-                    <select
-                      id="timezone-select"
-                      value={selectedTimeZone}
-                      onChange={(e) => setSelectedTimeZone(e.target.value)}
-                      disabled={saving}
-                    >
-                      {TIME_ZONES.map((tz) => (
-                        <option key={tz.abbr} value={tz.abbr}>{tz.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {activeDateKey ? (
-                    <>
-                      <p>Editing time slots for {activeDateLabel}</p>
-                      <div className="time-slots-grid">
-                        {TIME_SLOTS.map((time) => (
-                          <label key={time} className="time-slot-label">
-                            <input
-                              type="checkbox"
-                              checked={(selectedDates[activeDateKey] || []).includes(time)}
-                              onChange={() => toggleTimeSlot(activeDateKey, time)}
-                              disabled={saving}
-                            />
-                            <span>{time}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </>
+              <div className="view-toggle">
+                <span className={!gridMode ? 'toggle-mode active' : 'toggle-mode'}>Date View</span>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={gridMode}
+                    onChange={(e) => setGridMode(e.target.checked)}
+                    disabled={saving}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+                <span className={gridMode ? 'toggle-mode active' : 'toggle-mode'}>Grid View</span>
+              </div>
+
+              {gridMode ? (
+                <div
+                  className="wm-wrapper"
+                  onMouseLeave={() => { isDraggingRef.current = false; }}
+                >
+                  {sortedDates.length === 0 ? (
+                    <p className="wm-no-dates">Switch to Date View to select dates first.</p>
                   ) : (
-                    <p>Select a date to edit its time slots.</p>
+                    <div
+                      className="wm-grid"
+                      style={{ gridTemplateColumns: `90px repeat(${sortedDates.length}, minmax(60px, 1fr))` }}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <div className="wm-corner" />
+                      {sortedDates.map((dateKey) => (
+                        <div key={dateKey} className="wm-date-header">
+                          {new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', {
+                            weekday: 'short', month: 'numeric', day: 'numeric',
+                          })}
+                        </div>
+                      ))}
+                      {TIME_SLOTS.map((time) => (
+                        <React.Fragment key={time}>
+                          <div className="wm-time-label">{time}</div>
+                          {sortedDates.map((dateKey) => {
+                            const isSelected = (selectedDates[dateKey] || []).includes(time);
+                            return (
+                              <div
+                                key={dateKey}
+                                className={`wm-cell${isSelected ? ' selected' : ''}`}
+                                onMouseDown={() => handleGridMouseDown(dateKey, time)}
+                                onMouseEnter={() => handleGridMouseEnter(dateKey, time)}
+                              />
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
+              ) : (
+                <div className="availability-panel">
+                  <div className="calendar-panel">
+                    <div className="calendar-header">
+                      <button type="button" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} disabled={saving}>←</button>
+                      <span>{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
+                      <button type="button" onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} disabled={saving}>→</button>
+                    </div>
+                    <div className="calendar-grid">
+                      {DAYS_OF_WEEK.map((day) => (
+                        <div key={day} className="calendar-day-header">{day}</div>
+                      ))}
+                      {Array.from({ length: getFirstDayOfMonth(currentDate) }).map((_, index) => (
+                        <div key={`empty-${index}`} className="calendar-day empty" />
+                      ))}
+                      {Array.from({ length: getDaysInMonth(currentDate) }).map((_, index) => {
+                        const dayNum = index + 1;
+                        const dateKey = formatDateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum));
+                        const isSelected = !!selectedDates[dateKey];
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            className={`calendar-day${isSelected ? ' selected' : ''}${activeDateKey === dateKey ? ' active' : ''}`}
+                            onClick={() => toggleDate(dayNum)}
+                            disabled={saving}
+                          >
+                            {dayNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="time-slot-panel">
+                    <div className="timezone-row">
+                      <label htmlFor="timezone-select">Time Zone</label>
+                      <select
+                        id="timezone-select"
+                        value={selectedTimeZone}
+                        onChange={(e) => setSelectedTimeZone(e.target.value)}
+                        disabled={saving}
+                      >
+                        {TIME_ZONES.map((tz) => (
+                          <option key={tz.abbr} value={tz.abbr}>{tz.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {activeDateKey ? (
+                      <>
+                        <p>Editing time slots for {activeDateLabel}</p>
+                        <div className="time-slots-grid">
+                          {TIME_SLOTS.map((time) => (
+                            <label key={time} className="time-slot-label">
+                              <input
+                                type="checkbox"
+                                checked={(selectedDates[activeDateKey] || []).includes(time)}
+                                onChange={() => toggleTimeSlot(activeDateKey, time)}
+                                disabled={saving}
+                              />
+                              <span>{time}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p>Select a date to edit its time slots.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="button-row">
               <button type="submit" className="save-button" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Profile'}
               </button>
+              {activeDateKey && (selectedDates[activeDateKey] || []).length > 0 && (
+                <button type="button" className="paste-weekday-button" onClick={pasteTimesToWeekday} disabled={saving}>
+                  {getPasteButtonLabel()}
+                </button>
+              )}
               <button type="button" className="cancel-button" onClick={() => setEditMode(false)} disabled={saving}>
                 Cancel
               </button>
