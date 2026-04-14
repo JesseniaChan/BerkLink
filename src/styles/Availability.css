@@ -157,6 +157,19 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.calendar-day.active {
+  outline: 3px solid #764ba2;
+  outline-offset: 2px;
+}
+
+.calendar-day.selected.active {
+  background: #764ba2;
+  border-color: #764ba2;
+  outline: 3px solid #4a2f7a;
+  outline-offset: 2px;
+  box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4);
+}
+
 /* Time Zones Panel */
 .timezone-placeholder {
   display: flex;
@@ -403,6 +416,31 @@
   font-size: 13px;
   margin: 0;
   line-height: 1.5;
+}
+
+.paste-button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  letter-spacing: 0.2px;
+}
+
+.paste-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(118, 75, 162, 0.4);
+}
+
+.paste-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .button-group {
