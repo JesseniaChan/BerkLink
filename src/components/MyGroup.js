@@ -5,67 +5,137 @@ import '../styles/MyGroup.css';
 
 export default function MyGroup({ userId }) {
   const [groups, setGroups] = useState([]);
+  const [userClasses, setUserClasses] = useState([]);
+  const [potentialGroupsByClass, setPotentialGroupsByClass] = useState({});
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState('');
-  const [selectedMember, setSelectedMember] = useState(null); // for profile modal
+  const [selectedMember, setSelectedMember] = useState(null);
   const [calendarStatus, setCalendarStatus] = useState({});
+
+  function getSharedAvailability(members) {
+    if (!members || members.length === 0) return [];
+
+    const availabilities = members.map((member) => member.availability_dates || {});
+    if (availabilities.some((availability) => Object.keys(availability).length === 0)) {
+      return [];
+    }
+
+    const firstDates = Object.keys(availabilities[0]);
+    const shared = firstDates.reduce((acc, date) => {
+      const initialTimes = availabilities[0][date] || [];
+      if (initialTimes.length === 0) return acc;
+
+      const commonTimes = availabilities.slice(1).reduce((times, availability) => {
+        const nextTimes = availability[date] || [];
+        return times.filter((time) => nextTimes.includes(time));
+      }, initialTimes);
+
+      if (commonTimes.length > 0) {
+        acc.push({ date, times: commonTimes });
+      }
+      return acc;
+    }, []);
+
+    return shared;
+  }
+
+  const enrichGroups = useCallback(async (rawGroups) => {
+    const enriched = await Promise.all(
+      (rawGroups || []).map(async (group) => {
+        const { data: members } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', group.id);
+
+        const memberIds = (members || []).map((member) => member.user_id);
+        const { data: studentDetails } = memberIds.length > 0
+          ? await supabase
+            .from('students')
+            .select('user_id, instagram, phone, classes, availability_dates, google_calendar_connected')
+            .in('user_id', memberIds)
+          : { data: [] };
+
+        return {
+          ...group,
+          members: studentDetails || [],
+          matched_availability: getSharedAvailability(studentDetails || []),
+          isUserMember: memberIds.includes(userId),
+        };
+      })
+    );
+
+    return enriched;
+  }, [userId]);
 
   const fetchMyGroups = useCallback(async () => {
     setLoading(true);
+
+    const { data: studentProfile } = await supabase
+      .from('students')
+      .select('classes')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const classes = studentProfile?.classes || [];
+    setUserClasses(classes);
 
     const { data: memberships } = await supabase
       .from('group_members')
       .select('group_id')
       .eq('user_id', userId);
 
-    if (!memberships || memberships.length === 0) {
-      setGroups([]);
-      setLoading(false);
-      return;
-    }
+    const groupIds = (memberships || []).map((membership) => membership.group_id);
+    const { data: myGroupDetails } = groupIds.length > 0
+      ? await supabase
+        .from('study_groups')
+        .select('*')
+        .in('id', groupIds)
+      : { data: [] };
 
-    const groupIds = memberships.map(m => m.group_id);
+    const myGroups = await enrichGroups(myGroupDetails || []);
+    setGroups(myGroups);
 
-    const { data: groupDetails } = await supabase
-      .from('study_groups')
-      .select('*')
-      .in('id', groupIds);
+    const { data: potentialGroupDetails } = classes.length > 0
+      ? await supabase
+        .from('study_groups')
+        .select('*')
+        .in('class_code', classes)
+      : { data: [] };
 
-    const enriched = await Promise.all(
-      (groupDetails || []).map(async (group) => {
-        const { data: members } = await supabase
-          .from('group_members')
-          .select('user_id')
-          .eq('group_id', group.id);
+    const potentialGroups = await enrichGroups(potentialGroupDetails || []);
+    const groupedPotentialGroups = potentialGroups.reduce((acc, group) => {
+      const classCode = group.class_code || 'Other';
+      if (!acc[classCode]) acc[classCode] = [];
+      acc[classCode].push(group);
+      return acc;
+    }, {});
 
-        const memberIds = (members || []).map(m => m.user_id);
+    Object.values(groupedPotentialGroups).forEach((classGroups) => {
+      classGroups.sort((a, b) => {
+        const dayCompare = (a.day_of_week || '').localeCompare(b.day_of_week || '');
+        if (dayCompare !== 0) return dayCompare;
+        return (a.time_slot || '').localeCompare(b.time_slot || '');
+      });
+    });
 
-        const { data: studentDetails } = await supabase
-          .from('students')
-          .select('user_id, instagram, phone, classes, availability_dates, google_calendar_connected')
-          .in('user_id', memberIds);
-
-        return {
-          ...group,
-          members: studentDetails || [],
-          matched_availability: getSharedAvailability(studentDetails || []),
-        };
-      })
-    );
-
-    setGroups(enriched);
+    setPotentialGroupsByClass(groupedPotentialGroups);
     setLoading(false);
-  }, [userId]);
+  }, [enrichGroups, userId]);
 
-  useEffect(() => { fetchMyGroups(); }, [fetchMyGroups]);
+  useEffect(() => {
+    fetchMyGroups();
+  }, [fetchMyGroups]);
 
   async function runMatcher() {
     setRunning(true);
     const { error } = await supabase.rpc('auto_assign_groups');
     setRunning(false);
-    if (error) showToast('Error: ' + error.message);
-    else { showToast('Groups updated!'); fetchMyGroups(); }
+    if (error) showToast(`Error: ${error.message}`);
+    else {
+      showToast('Groups updated!');
+      fetchMyGroups();
+    }
   }
 
   function getEventStartEnd(dateKey, timeSlot) {
@@ -90,7 +160,7 @@ export default function MyGroup({ userId }) {
 
     setCalendarStatus((prev) => ({
       ...prev,
-      [group.id]: { loading: true, message: 'Creating calendar event…' },
+      [group.id]: { loading: true, message: 'Creating calendar event...' },
     }));
 
     try {
@@ -141,51 +211,13 @@ export default function MyGroup({ userId }) {
       .delete()
       .eq('group_id', groupId)
       .eq('user_id', userId);
+
     fetchMyGroups();
   }
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
-  }
-
-  // eslint-disable-next-line no-unused-vars
-  function formatDates(availability_dates) {
-    if (!availability_dates) return 'No availability set';
-    return Object.entries(availability_dates)
-      .map(([date, times]) => {
-        const d = new Date(date + 'T00:00:00');
-        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        return times.length > 0 ? `${label}: ${times.join(', ')}` : label;
-      })
-      .join(' · ');
-  }
-
-  function getSharedAvailability(members) {
-    if (!members || members.length === 0) return [];
-
-    const availabilities = members.map((member) => member.availability_dates || {});
-    if (availabilities.some((availability) => Object.keys(availability).length === 0)) {
-      return [];
-    }
-
-    const firstDates = Object.keys(availabilities[0]);
-    const shared = firstDates.reduce((acc, date) => {
-      const initialTimes = availabilities[0][date] || [];
-      if (initialTimes.length === 0) return acc;
-
-      const commonTimes = availabilities.slice(1).reduce((times, availability) => {
-        const nextTimes = availability[date] || [];
-        return times.filter((time) => nextTimes.includes(time));
-      }, initialTimes);
-
-      if (commonTimes.length > 0) {
-        acc.push({ date, times: commonTimes });
-      }
-      return acc;
-    }, []);
-
-    return shared;
   }
 
   function formatExactTimes(sharedAvailability) {
@@ -195,24 +227,109 @@ export default function MyGroup({ userId }) {
 
     return sharedAvailability
       .map(({ date, times }) => {
-        const d = new Date(date + 'T00:00:00');
-        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        return `${label}: ${times.join(', ')}`;
+        const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        });
+        return `${dateLabel}: ${times.join(', ')}`;
       })
       .join(' · ');
   }
 
-  if (loading) return <div className="loading-container"><div className="loading-spinner">Loading...</div></div>;
+  function renderMemberCard(member) {
+    return (
+      <div
+        key={member.user_id}
+        className={`member-card ${member.user_id === userId ? 'is-you' : ''}`}
+        onClick={() => member.user_id !== userId && setSelectedMember(member)}
+      >
+        <div className="member-avatar">
+          {member.instagram?.[0]?.toUpperCase() || '?'}
+          {member.user_id === userId && <span className="you-badge">You</span>}
+        </div>
+        <div className="member-info">
+          <div className="member-handle">@{member.instagram || 'unknown'}</div>
+          {member.classes && (
+            <div className="member-classes">
+              {member.classes.slice(0, 3).map((cls) => (
+                <span key={cls} className="mini-class-tag">{cls}</span>
+              ))}
+            </div>
+          )}
+          {member.user_id !== userId && (
+            <span className="view-profile-hint">Tap to view profile -&gt;</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderGroupCard(group, options = {}) {
+    const { canLeave = false, showCalendarSync = false } = options;
+
+    return (
+      <div key={group.id} className={`group-card ${group.isUserMember ? 'is-member' : 'is-potential'}`}>
+        <div className="group-card-header">
+          <div>
+            <div className="group-card-badges">
+              <span className="group-badge">{group.class_code}</span>
+              {group.isUserMember && <span className="membership-pill">Your group</span>}
+            </div>
+            <div className="group-meta">
+              <span>Day: {group.day_of_week}</span>
+              <span>Time: {group.time_slot}</span>
+              <span>Members: {group.members.length}</span>
+            </div>
+            <div className="group-meta exact-times">
+              <span>Exact matches: {formatExactTimes(group.matched_availability)}</span>
+            </div>
+            {showCalendarSync && (
+              <div className="group-meta calendar-sync">
+                {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
+                  <button
+                    className="sync-calendar-btn"
+                    type="button"
+                    onClick={() => createCalendarEventForGroup(group)}
+                    disabled={calendarStatus[group.id]?.loading}
+                  >
+                    {calendarStatus[group.id]?.loading ? 'Syncing...' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
+                  </button>
+                ) : (
+                  <span className="calendar-sync-note">Connect Google Calendar from your profile to sync matched groups.</span>
+                )}
+              </div>
+            )}
+          </div>
+          {canLeave && (
+            <button className="leave-btn" onClick={() => leaveGroup(group.id)}>
+              Leave
+            </button>
+          )}
+        </div>
+
+        <div className="members-grid">
+          {group.members.map(renderMemberCard)}
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="loading-container"><div className="loading-spinner">Loading...</div></div>;
+  }
+
+  const matchedGroups = groups.filter((group) => group.matched_availability && group.matched_availability.length > 0);
+  const classSections = userClasses.length > 0 ? userClasses : Object.keys(potentialGroupsByClass);
 
   return (
     <div className="mygroup-container">
       {toast && <div className="toast-message">{toast}</div>}
 
-      {/* Profile Modal */}
       {selectedMember && (
         <div className="profile-modal-overlay" onClick={() => setSelectedMember(null)}>
-          <div className="profile-modal" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelectedMember(null)}>✕</button>
+          <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSelectedMember(null)}>X</button>
 
             <div className="modal-avatar">
               {selectedMember.instagram?.[0]?.toUpperCase() || '?'}
@@ -228,12 +345,12 @@ export default function MyGroup({ userId }) {
                   rel="noreferrer"
                   className="modal-link instagram"
                 >
-                  📸 @{selectedMember.instagram}
+                  Instagram: @{selectedMember.instagram}
                 </a>
               )}
               {selectedMember.phone && (
                 <a href={`tel:${selectedMember.phone}`} className="modal-link phone">
-                  📞 {selectedMember.phone.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3')}
+                  Phone: {selectedMember.phone.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3')}
                 </a>
               )}
             </div>
@@ -242,7 +359,7 @@ export default function MyGroup({ userId }) {
               <div className="modal-section">
                 <h4>Classes</h4>
                 <div className="modal-classes">
-                  {selectedMember.classes.map(cls => (
+                  {selectedMember.classes.map((cls) => (
                     <span key={cls} className="modal-class-tag">{cls}</span>
                   ))}
                 </div>
@@ -254,8 +371,12 @@ export default function MyGroup({ userId }) {
                 <h4>Availability</h4>
                 <div className="modal-availability">
                   {Object.entries(selectedMember.availability_dates).map(([date, times]) => {
-                    const d = new Date(date + 'T00:00:00');
-                    const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const label = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    });
+
                     return (
                       <div key={date} className="modal-avail-row">
                         <span className="modal-avail-date">{label}</span>
@@ -272,87 +393,72 @@ export default function MyGroup({ userId }) {
         </div>
       )}
 
-      {/* Header */}
       <div className="mygroup-header">
         <h2>My Study Groups</h2>
         <p>You're in {groups.length} group{groups.length !== 1 ? 's' : ''}</p>
         <button className="run-matcher-btn" onClick={runMatcher} disabled={running}>
-          {running ? 'Finding groups...' : '⚡ Find / Refresh My Groups'}
+          {running ? 'Finding groups...' : 'Find / Refresh My Groups'}
         </button>
       </div>
 
-      {groups.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">🔍</div>
-          <h3>No groups yet</h3>
-          <p>Click "Find / Refresh My Groups" above to get matched with students in your classes on the same dates and times.</p>
+      <div className="groups-section">
+        <div className="section-heading">
+          <h3>Your Groups</h3>
+          <p>Groups that already match your class and exact time availability.</p>
         </div>
-      ) : (
-        <div className="groups-list">
-          {groups.map(group => (
-            <div key={group.id} className="group-card">
-              <div className="group-card-header">
-                <div>
-                  <span className="group-badge">{group.class_code}</span>
-                  <div className="group-meta">
-                    <span>📅 {group.day_of_week}</span>
-                    <span>🕐 {group.time_slot}</span>
-                    <span>👥 {group.members.length} members</span>
-                  </div>
-                  <div className="group-meta exact-times">
-                    <span>⏱ {formatExactTimes(group.matched_availability)}</span>
-                  </div>
-                  <div className="group-meta calendar-sync">
-                    {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
-                      <button
-                        className="sync-calendar-btn"
-                        type="button"
-                        onClick={() => createCalendarEventForGroup(group)}
-                        disabled={calendarStatus[group.id]?.loading}
-                      >
-                        {calendarStatus[group.id]?.loading ? 'Syncing…' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
-                      </button>
-                    ) : (
-                      <span className="calendar-sync-note">Connect Google Calendar from your profile to sync matched groups.</span>
-                    )}
-                  </div>
-                </div>
-                <button className="leave-btn" onClick={() => leaveGroup(group.id)}>
-                  Leave
-                </button>
-              </div>
 
-              <div className="members-grid">
-                {group.members.map(member => (
-                  <div
-                    key={member.user_id}
-                    className={`member-card ${member.user_id === userId ? 'is-you' : ''}`}
-                    onClick={() => member.user_id !== userId && setSelectedMember(member)}
-                  >
-                    <div className="member-avatar">
-                      {member.instagram?.[0]?.toUpperCase() || '?'}
-                      {member.user_id === userId && <span className="you-badge">You</span>}
-                    </div>
-                    <div className="member-info">
-                      <div className="member-handle">@{member.instagram || 'unknown'}</div>
-                      {member.classes && (
-                        <div className="member-classes">
-                          {member.classes.slice(0, 3).map(cls => (
-                            <span key={cls} className="mini-class-tag">{cls}</span>
-                          ))}
-                        </div>
-                      )}
-                      {member.user_id !== userId && (
-                        <span className="view-profile-hint">Tap to view profile →</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+        {matchedGroups.length === 0 ? (
+          <div className="empty-state compact">
+            <div className="empty-icon">?</div>
+            <h3>No matched groups yet</h3>
+            <p>Click "Find / Refresh My Groups" above to get matched with students in your classes on the same dates and times.</p>
+          </div>
+        ) : (
+          <div className="groups-list">
+            {matchedGroups.map((group) => renderGroupCard(group, { canLeave: true, showCalendarSync: true }))}
+          </div>
+        )}
+      </div>
+
+      <div className="groups-section">
+        <div className="section-heading">
+          <h3>All Potential Groups For Your Classes</h3>
+          <p>Each class has its own scrollable container so you can browse options separately.</p>
         </div>
-      )}
+
+        {classSections.length === 0 ? (
+          <div className="empty-state compact">
+            <div className="empty-icon">+</div>
+            <h3>No classes added yet</h3>
+            <p>Add your classes in onboarding or your profile to see potential study groups here.</p>
+          </div>
+        ) : (
+          <div className="class-groups-sections">
+            {classSections.map((classCode) => {
+              const classGroups = potentialGroupsByClass[classCode] || [];
+
+              return (
+                <section key={classCode} className="class-groups-panel">
+                  <div className="class-groups-header">
+                    <span className="group-badge">{classCode}</span>
+                    <p>{classGroups.length} potential group{classGroups.length !== 1 ? 's' : ''}</p>
+                  </div>
+
+                  {classGroups.length === 0 ? (
+                    <div className="class-groups-empty">
+                      No groups found for {classCode} yet.
+                    </div>
+                  ) : (
+                    <div className="class-groups-scroll">
+                      {classGroups.map((group) => renderGroupCard(group))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
