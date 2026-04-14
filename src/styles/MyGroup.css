@@ -1,7 +1,7 @@
 /* MyGroup.css */
 
 .mygroup-container {
-  max-width: 800px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 2rem 1rem;
 }
@@ -34,36 +34,100 @@
   transition: background 0.15s;
 }
 
-.run-matcher-btn:hover { background: #2563eb; }
-.run-matcher-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.run-matcher-btn:hover {
+  background: #2563eb;
+}
 
-/* Empty state */
+.run-matcher-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.groups-section {
+  margin-bottom: 2rem;
+}
+
+.section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.section-heading h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
   color: #6b7280;
 }
 
-.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
-.empty-state h3 { font-size: 1.2rem; color: #111; margin-bottom: 0.5rem; }
+.empty-state.compact {
+  padding: 2.25rem 1.5rem;
+  border: 1px dashed #d1d5db;
+  border-radius: 16px;
+  background: #f9fafb;
+}
 
-/* Groups */
-.groups-list { display: flex; flex-direction: column; gap: 1.5rem; }
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  font-size: 1.2rem;
+  color: #111;
+  margin-bottom: 0.5rem;
+}
+
+.groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 
 .group-card {
   border: 1px solid #e5e7eb;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  background: #fff;
+}
+
+.group-card.is-member {
+  border-color: #bfdbfe;
+}
+
+.group-card.is-potential {
+  min-width: 320px;
 }
 
 .group-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 1rem;
   padding: 1.25rem 1.5rem;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.group-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
 }
 
 .group-badge {
@@ -75,7 +139,18 @@
   font-size: 12px;
   font-weight: 700;
   padding: 3px 10px;
-  margin-bottom: 8px;
+}
+
+.membership-pill {
+  display: inline-flex;
+  align-items: center;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
 }
 
 .group-meta {
@@ -97,9 +172,11 @@
   transition: all 0.15s;
 }
 
-.leave-btn:hover { border-color: #ef4444; color: #ef4444; }
+.leave-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
 
-/* Members grid */
 .members-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -119,8 +196,14 @@
   transition: background 0.15s;
 }
 
-.member-card:hover:not(.is-you) { background: #f0f7ff; }
-.member-card.is-you { background: #fafafa; cursor: default; }
+.member-card:hover:not(.is-you) {
+  background: #f0f7ff;
+}
+
+.member-card.is-you {
+  background: #fafafa;
+  cursor: default;
+}
 
 .member-avatar {
   width: 56px;
@@ -186,11 +269,57 @@
   margin-top: 4px;
 }
 
-/* ── Profile Modal ─────────────────────────────────────── */
+.class-groups-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.class-groups-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  overflow: hidden;
+}
+
+.class-groups-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgba(249, 250, 251, 0.9);
+}
+
+.class-groups-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.92rem;
+}
+
+.class-groups-scroll {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 1.25rem;
+  scroll-snap-type: x proximity;
+}
+
+.class-groups-scroll .group-card {
+  flex: 0 0 min(400px, 90%);
+  scroll-snap-align: start;
+}
+
+.class-groups-empty {
+  padding: 1.25rem;
+  color: #6b7280;
+}
+
 .profile-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -207,7 +336,7 @@
   max-height: 85vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
 .modal-close {
@@ -227,7 +356,10 @@
   justify-content: center;
 }
 
-.modal-close:hover { background: #e5e7eb; color: #111; }
+.modal-close:hover {
+  background: #e5e7eb;
+  color: #111;
+}
 
 .modal-avatar {
   width: 80px;
@@ -280,10 +412,23 @@
   transition: background 0.15s;
 }
 
-.modal-link.instagram { background: #fdf2f8; color: #9333ea; }
-.modal-link.instagram:hover { background: #fae8ff; }
-.modal-link.phone { background: #f0fdf4; color: #16a34a; }
-.modal-link.phone:hover { background: #dcfce7; }
+.modal-link.instagram {
+  background: #fdf2f8;
+  color: #9333ea;
+}
+
+.modal-link.instagram:hover {
+  background: #fae8ff;
+}
+
+.modal-link.phone {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.modal-link.phone:hover {
+  background: #dcfce7;
+}
 
 .modal-classes {
   display: flex;
@@ -320,7 +465,6 @@
   color: #6b7280;
 }
 
-/* Toast */
 .toast-message {
   position: fixed;
   bottom: 24px;
@@ -332,5 +476,26 @@
   font-weight: 500;
   padding: 12px 20px;
   z-index: 999;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 768px) {
+  .group-card-header,
+  .class-groups-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leave-btn {
+    align-self: flex-start;
+  }
+
+  .class-groups-scroll {
+    padding: 1rem;
+  }
+
+  .class-groups-scroll .group-card {
+    flex-basis: 100%;
+    min-width: 0;
+  }
 }
