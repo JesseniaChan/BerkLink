@@ -3,18 +3,26 @@ import './App.css';
 import { supabase } from './supabaseClient';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
+import ForgotPasswordForm from './components/ForgotPasswordForm';
+import ResetPasswordForm from './components/ResetPasswordForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
 import ProfilePage from './components/ProfilePage';
 import MyGroup from './components/MyGroup';
 
 function App() {
-  const [isLogin, setIsLogin] = useState(false);
+  const [authForm, setAuthForm] = useState('login'); // 'login', 'signup', 'forgotPassword', 'resetPassword'
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
   const [page, setPage] = useState('onboarding');
 
   useEffect(() => {
+    // Check for recovery token in URL (when user clicks reset link in email)
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setAuthForm('resetPassword');
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -57,6 +65,11 @@ function App() {
   const handleOnboardingComplete = (redirectPage = 'mygroup') => {
     setHasProfile(true);
     setPage(redirectPage);
+  };
+
+  const handleResetPasswordComplete = () => {
+    // After password reset, switch to login form
+    setAuthForm('login');
   };
 
   if (loading) {
@@ -114,10 +127,23 @@ function App() {
 
   return (
     <div className="App">
-      {isLogin ? (
-        <LoginForm onSwitchToSignup={() => setIsLogin(false)} />
-      ) : (
-        <SignupForm onSwitchToLogin={() => setIsLogin(true)} />
+      {authForm === 'login' && (
+        <LoginForm
+          onSwitchToSignup={() => setAuthForm('signup')}
+          onSwitchToForgotPassword={() => setAuthForm('forgotPassword')}
+        />
+      )}
+      {authForm === 'signup' && (
+        <SignupForm onSwitchToLogin={() => setAuthForm('login')} />
+      )}
+      {authForm === 'forgotPassword' && (
+        <ForgotPasswordForm onSwitchToLogin={() => setAuthForm('login')} />
+      )}
+      {authForm === 'resetPassword' && (
+        <ResetPasswordForm
+          onResetComplete={handleResetPasswordComplete}
+          onSwitchToLogin={() => setAuthForm('login')}
+        />
       )}
     </div>
   );
