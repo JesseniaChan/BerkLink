@@ -518,6 +518,34 @@
   color: var(--text3);
 }
 
+/* ── ONBOARDING PREVIEW BUTTON ── */
+.onboarding-preview-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.onboarding-preview-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text3);
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 20px;
+  transition: all 0.15s;
+}
+
+.onboarding-preview-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-light);
+}
+
 /* ── MESSAGES ── */
 .success-message,
 .error-message {

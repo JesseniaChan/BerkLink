@@ -75,7 +75,7 @@ const validatePhone = (value) => normalizePhone(value).length === 10;
 const normalizeClassName = (value = '') => value.replace(/\s+/g, '').toUpperCase().trim();
 const normalizeClassList = (classes = []) => [...new Set(classes.map((className) => normalizeClassName(className)).filter(Boolean))];
 
-export default function ProfilePage({ userId, onProfileUpdated }) {
+export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -536,6 +536,15 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Dev shortcut */}
+          {onGoToOnboarding && (
+            <div className="onboarding-preview-row">
+              <button className="onboarding-preview-btn" onClick={onGoToOnboarding}>
+                Preview Onboarding Flow →
+              </button>
             </div>
           )}
         </>
