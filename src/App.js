@@ -84,7 +84,10 @@ function App() {
     return (
       <div className="App">
         <nav className="app-nav">
-          <span className="nav-brand">◈ BerkLink</span>
+          <div className="nav-logo">
+            <div className="logo-mark"><span>B</span></div>
+            <span className="logo-text">Berk<span className="gold">Link</span></span>
+          </div>
           <div className="nav-links">
             <button
               className={`nav-btn ${page === 'profile' ? 'active' : ''}`}
