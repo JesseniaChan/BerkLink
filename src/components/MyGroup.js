@@ -241,26 +241,20 @@ export default function MyGroup({ userId }) {
     return (
       <div
         key={member.user_id}
-        className={`member-card ${member.user_id === userId ? 'is-you' : ''}`}
+        className={`member-tile ${member.user_id === userId ? 'is-you' : ''}`}
         onClick={() => member.user_id !== userId && setSelectedMember(member)}
       >
-        <div className="member-avatar">
+        <div className="m-avatar">
           {member.instagram?.[0]?.toUpperCase() || '?'}
-          {member.user_id === userId && <span className="you-badge">You</span>}
+          {member.user_id === userId && <span className="you-tag">YOU</span>}
         </div>
-        <div className="member-info">
-          <div className="member-handle">@{member.instagram || 'unknown'}</div>
-          {member.classes && (
-            <div className="member-classes">
-              {member.classes.slice(0, 3).map((cls) => (
-                <span key={cls} className="mini-class-tag">{cls}</span>
-              ))}
-            </div>
-          )}
-          {member.user_id !== userId && (
-            <span className="view-profile-hint">Tap to view profile -&gt;</span>
-          )}
-        </div>
+        <div className="m-handle">@{member.instagram || 'unknown'}</div>
+        {member.classes && member.classes.length > 0 && (
+          <div className="m-class">{member.classes[0]}</div>
+        )}
+        {member.user_id !== userId && (
+          <div className="m-tap">View profile →</div>
+        )}
       </div>
     );
   }
@@ -272,20 +266,18 @@ export default function MyGroup({ userId }) {
       <div key={group.id} className={`group-card ${group.isUserMember ? 'is-member' : 'is-potential'}`}>
         <div className="group-card-header">
           <div>
-            <div className="group-card-badges">
-              <span className="group-badge">{group.class_code}</span>
-              {group.isUserMember && <span className="membership-pill">Your group</span>}
-            </div>
+            <div className="group-class">{group.class_code}</div>
             <div className="group-meta">
-              <span>Day: {group.day_of_week}</span>
-              <span>Time: {group.time_slot}</span>
-              <span>Members: {group.members.length}</span>
+              {group.day_of_week && <span>📅 {group.day_of_week}</span>}
+              {group.time_slot && <span>🕐 {group.time_slot}</span>}
             </div>
-            <div className="group-meta exact-times">
-              <span>Exact matches: {formatExactTimes(group.matched_availability)}</span>
-            </div>
+            {group.matched_availability && group.matched_availability.length > 0 && (
+              <div className="group-exact-times">
+                Exact matches: {formatExactTimes(group.matched_availability)}
+              </div>
+            )}
             {showCalendarSync && (
-              <div className="group-meta calendar-sync">
+              <div className="group-calendar-sync">
                 {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
                   <button
                     className="sync-calendar-btn"
@@ -296,19 +288,22 @@ export default function MyGroup({ userId }) {
                     {calendarStatus[group.id]?.loading ? 'Syncing...' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
                   </button>
                 ) : (
-                  <span className="calendar-sync-note">Connect Google Calendar from your profile to sync matched groups.</span>
+                  <span className="calendar-sync-note">Connect Google Calendar from your profile to sync.</span>
                 )}
               </div>
             )}
           </div>
-          {canLeave && (
-            <button className="leave-btn" onClick={() => leaveGroup(group.id)}>
-              Leave
-            </button>
-          )}
+          <div className="group-header-right">
+            <span className="member-count-badge">{group.members.length} members</span>
+            {canLeave && (
+              <button className="leave-btn" onClick={() => leaveGroup(group.id)}>
+                Leave
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="members-grid">
+        <div className="members-row">
           {group.members.map(renderMemberCard)}
         </div>
       </div>
@@ -394,11 +389,13 @@ export default function MyGroup({ userId }) {
       )}
 
       <div className="mygroup-header">
-        <h2>My Study Groups</h2>
-        <p>You're in {groups.length} group{groups.length !== 1 ? 's' : ''}</p>
-        <button className="run-matcher-btn" onClick={runMatcher} disabled={running}>
-          {running ? 'Finding groups...' : 'Find / Refresh My Groups'}
-        </button>
+        <div className="section-header">
+          <div className="section-title">My Study Groups</div>
+          <button className="refresh-btn" onClick={runMatcher} disabled={running}>
+            {running ? 'Finding...' : '⚡ Find My Groups'}
+          </button>
+        </div>
+        <p className="groups-count">You're in {groups.length} group{groups.length !== 1 ? 's' : ''}</p>
       </div>
 
       <div className="groups-section">
