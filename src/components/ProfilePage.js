@@ -75,7 +75,7 @@ const validatePhone = (value) => normalizePhone(value).length === 10;
 const normalizeClassName = (value = '') => value.replace(/\s+/g, '').toUpperCase().trim();
 const normalizeClassList = (classes = []) => [...new Set(classes.map((className) => normalizeClassName(className)).filter(Boolean))];
 
-export default function ProfilePage({ userId, onProfileUpdated }) {
+export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -337,7 +337,9 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
     return (
       <div className="profile-page">
         <div className="profile-card">
-          <h2>Your Profile</h2>
+          <div className="profile-header">
+            <h2>Your Profile</h2>
+          </div>
           <p className="profile-empty">No profile data found yet.</p>
           <button className="edit-profile-button" onClick={() => setEditMode(true)}>
             Create Profile
@@ -349,72 +351,116 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
   return (
     <div className="profile-page">
-      <div className="profile-card">
-        <div className="profile-header">
-          <h2>Your Profile</h2>
-          {!editMode && (
-            <button className="edit-profile-button" onClick={() => setEditMode(true)}>
-              Edit Profile
-            </button>
-          )}
-        </div>
+      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message">{error}</div>}
 
-        {success && <div className="success-message">{success}</div>}
-        {error && <div className="error-message">{error}</div>}
-
-        {!editMode ? (
-          <div className="profile-summary">
-            <div className="profile-field">
-              <span className="field-label">Instagram</span>
-              <span className="field-value">{profile?.instagram || 'Not set'}</span>
+      {!editMode ? (
+        <>
+          {/* Hero */}
+          <div className="profile-hero">
+            <div className="hero-avatar">
+              {profile?.instagram?.[0]?.toUpperCase() || '?'}
             </div>
-            <div className="profile-field">
-              <span className="field-label">Phone</span>
-              <span className="field-value">{profile?.phone ? formatPhone(profile.phone) : 'Not set'}</span>
-            </div>
-            <div className="profile-field">
-              <span className="field-label">Calendar Sync</span>
-              <div className="field-value">
-                <span>{googleConnected ? 'Connected to Google Calendar' : 'Not connected'}</span>
-                <button
-                  type="button"
-                  className="connect-calendar-button"
-                  onClick={handleConnectGoogleCalendar}
-                  disabled={saving}
-                >
-                  {googleConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-                </button>
+            <div className="hero-info">
+              <div className="hero-name">@{profile?.instagram || 'unknown'}</div>
+              <div className="hero-badges">
+                {(profile?.classes || []).map((cls) => (
+                  <span key={cls} className="hero-badge">{cls}</span>
+                ))}
               </div>
             </div>
-            <div className="profile-field">
-              <span className="field-label">Classes</span>
-              {profile?.classes?.length > 0 ? (
-                <div className="profile-tags">
-                  {profile.classes.map((className) => (
-                    <span className="profile-tag" key={className}>{className}</span>
-                  ))}
+            <button className="edit-btn" onClick={() => setEditMode(true)}>
+              Edit Profile
+            </button>
+          </div>
+
+          {/* Contact + Classes */}
+          <div className="section-grid">
+            <div className="card">
+              <div className="card-label">Contact</div>
+              {profile?.instagram && (
+                <div className="contact-row">
+                  <div className="contact-icon ig">📸</div>
+                  <div>
+                    <div className="contact-label">Instagram</div>
+                    <div className="contact-value">@{profile.instagram}</div>
+                  </div>
                 </div>
-              ) : (
-                <span className="field-value">Not set</span>
+              )}
+              {profile?.phone && (
+                <div className="contact-row">
+                  <div className="contact-icon ph">📞</div>
+                  <div>
+                    <div className="contact-label">Phone</div>
+                    <div className="contact-value">{formatPhone(profile.phone)}</div>
+                  </div>
+                </div>
               )}
             </div>
-            <div className="profile-field availability-summary">
-              <span className="field-label">Availability</span>
-              {profile?.availability_dates && Object.keys(profile.availability_dates).length > 0 ? (
-                <div className="availability-list">
-                  {Object.entries(profile.availability_dates).map(([dateKey, times]) => (
-                    <div key={dateKey} className="availability-item">
-                      <strong>{formatDateLabel(dateKey)}:</strong>{' '}
-                      {times.length > 0 ? times.join(', ') : 'No times selected'}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <span className="field-value">Not set</span>
-              )}
+
+            <div className="card">
+              <div className="card-label">Classes</div>
+              <div className="classes-wrap">
+                {(profile?.classes || []).map((cls) => (
+                  <span key={cls} className="class-pill">{cls}</span>
+                ))}
+              </div>
             </div>
           </div>
-        ) : (
+
+          {/* Calendar Sync */}
+          <div className="calendar-card">
+            <div className="calendar-left">
+              <div className="cal-icon">📅</div>
+              <div>
+                <div className="cal-title">Google Calendar Sync</div>
+                <div className="cal-sub">
+                  {googleConnected
+                    ? 'Connected to Google Calendar'
+                    : 'Connect to auto-import your availability'}
+                </div>
+              </div>
+            </div>
+            <button className="cal-btn" onClick={handleConnectGoogleCalendar} disabled={saving}>
+              {saving ? 'Connecting...' : googleConnected ? 'Reconnect Calendar' : 'Connect Calendar'}
+            </button>
+          </div>
+
+          {/* Availability */}
+          {profile?.availability_dates && Object.keys(profile.availability_dates).length > 0 && (
+            <div className="card avail-card">
+              <div className="card-label">Availability</div>
+              <div className="avail-list">
+                {Object.entries(profile.availability_dates)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([dateKey, times]) => (
+                    <div key={dateKey} className="avail-row">
+                      <div className="avail-date">{formatDateLabel(dateKey)}</div>
+                      <div className="avail-times">
+                        {(times || []).length > 0
+                          ? times.map((t) => <span key={t} className="time-chip">{t}</span>)
+                          : <span className="no-times">No times set</span>}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dev shortcut */}
+          {onGoToOnboarding && (
+            <div className="onboarding-preview-row">
+              <button className="onboarding-preview-btn" onClick={onGoToOnboarding}>
+                Preview Onboarding Flow →
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="profile-card">
+          <div className="profile-header">
+            <h2>Edit Profile</h2>
+          </div>
           <form onSubmit={handleSave} className="profile-form">
             <div className="form-group">
               <label htmlFor="instagram">Instagram Handle</label>
@@ -612,8 +658,8 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
               </button>
             </div>
           </form>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
