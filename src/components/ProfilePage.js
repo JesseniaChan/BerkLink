@@ -116,6 +116,13 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
   }, [userId]);
 
   useEffect(() => {
+    if (profile?.availability_dates) {
+      const firstKey = Object.keys(profile.availability_dates).sort()[0];
+      if (firstKey) setAvailCalDate(new Date(`${firstKey}T00:00:00`));
+    }
+  }, [profile]);
+
+  useEffect(() => {
     if (profile && editMode) {
       setInstagram(profile.instagram || '');
       setPhone(formatPhone(profile.phone || ''));
@@ -276,8 +283,8 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
 
   const sortedDates = Object.keys(selectedDates).sort();
 
-  const [availViewMode, setAvailViewMode] = useState('list');
-  const [availCalDate, setAvailCalDate] = useState(new Date());
+  const [availViewMode, setAvailViewMode] = useState('calendar');
+  const [availCalDate, setAvailCalDate] = useState(() => new Date());
   const [availCalSelected, setAvailCalSelected] = useState('');
 
   const handleSave = async (e) => {
