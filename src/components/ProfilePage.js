@@ -276,6 +276,10 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
   const sortedDates = Object.keys(selectedDates).sort();
 
+  const [availViewMode, setAvailViewMode] = useState('list');
+  const [availCalDate, setAvailCalDate] = useState(new Date());
+  const [availCalSelected, setAvailCalSelected] = useState('');
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError('');
@@ -429,21 +433,109 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
           {/* Availability */}
           {profile?.availability_dates && Object.keys(profile.availability_dates).length > 0 && (
             <div className="card avail-card">
-              <div className="card-label">Availability</div>
-              <div className="avail-list">
-                {Object.entries(profile.availability_dates)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([dateKey, times]) => (
-                    <div key={dateKey} className="avail-row">
-                      <div className="avail-date">{formatDateLabel(dateKey)}</div>
-                      <div className="avail-times">
-                        {(times || []).length > 0
-                          ? times.map((t) => <span key={t} className="time-chip">{t}</span>)
-                          : <span className="no-times">No times set</span>}
-                      </div>
-                    </div>
-                  ))}
+              <div className="avail-card-header">
+                <div className="card-label">Availability</div>
+                <div className="avail-view-toggle">
+                  <button
+                    type="button"
+                    className={`avail-view-btn${availViewMode === 'list' ? ' active' : ''}`}
+                    onClick={() => setAvailViewMode('list')}
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    className={`avail-view-btn${availViewMode === 'calendar' ? ' active' : ''}`}
+                    onClick={() => {
+                      setAvailViewMode('calendar');
+                      const firstKey = Object.keys(profile.availability_dates).sort()[0];
+                      if (firstKey) setAvailCalDate(new Date(`${firstKey}T00:00:00`));
+                      setAvailCalSelected('');
+                    }}
+                  >
+                    Calendar
+                  </button>
+                </div>
               </div>
+
+              {availViewMode === 'list' ? (
+                <div className="avail-list">
+                  {Object.entries(profile.availability_dates)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([dateKey, times]) => (
+                      <div key={dateKey} className="avail-row">
+                        <div className="avail-date">{formatDateLabel(dateKey)}</div>
+                        <div className="avail-times">
+                          {(times || []).length > 0
+                            ? times.map((t) => <span key={t} className="time-chip">{t}</span>)
+                            : <span className="no-times">No times set</span>}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="avail-cal-wrapper">
+                  <div className="avail-cal-left">
+                    <div className="avail-cal-nav">
+                      <button
+                        type="button"
+                        className="avail-cal-arrow"
+                        onClick={() => setAvailCalDate(new Date(availCalDate.getFullYear(), availCalDate.getMonth() - 1, 1))}
+                      >←</button>
+                      <span className="avail-cal-month">{MONTHS[availCalDate.getMonth()]} {availCalDate.getFullYear()}</span>
+                      <button
+                        type="button"
+                        className="avail-cal-arrow"
+                        onClick={() => setAvailCalDate(new Date(availCalDate.getFullYear(), availCalDate.getMonth() + 1, 1))}
+                      >→</button>
+                    </div>
+                    <div className="avail-cal-grid">
+                      {DAYS_OF_WEEK.map((d) => (
+                        <div key={d} className="avail-cal-day-hdr">{d}</div>
+                      ))}
+                      {Array.from({ length: getFirstDayOfMonth(availCalDate) }).map((_, i) => (
+                        <div key={`e-${i}`} className="avail-cal-day empty" />
+                      ))}
+                      {Array.from({ length: getDaysInMonth(availCalDate) }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const dateKey = formatDateKey(new Date(availCalDate.getFullYear(), availCalDate.getMonth(), dayNum));
+                        const hasAvail = !!(profile.availability_dates[dateKey]?.length);
+                        const isSelected = availCalSelected === dateKey;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            className={`avail-cal-day${hasAvail ? ' has-avail' : ''}${isSelected ? ' selected' : ''}`}
+                            onClick={() => hasAvail && setAvailCalSelected(isSelected ? '' : dateKey)}
+                          >
+                            {dayNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="avail-cal-legend">
+                      <span className="avail-cal-legend-dot" /> Available dates
+                    </div>
+                  </div>
+                  <div className="avail-cal-right">
+                    {availCalSelected && profile.availability_dates[availCalSelected] ? (
+                      <>
+                        <div className="avail-cal-times-label">{formatDateLabel(availCalSelected)}</div>
+                        <div className="avail-times">
+                          {profile.availability_dates[availCalSelected].map((t) => (
+                            <span key={t} className="time-chip">{t}</span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="avail-cal-side-empty">
+                        <span className="avail-cal-legend-dot" />
+                        <span>Select a highlighted date to see times</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>
