@@ -2,6 +2,7 @@ import React, { useState} from 'react';
 import StudentInfo from './StudentInfo';
 import Availability from './Availability';
 import Classes from './Classes';
+import StudyLocations from './StudyLocations';
 import { markOnboardingComplete } from '../services/onboardingService';
 import '../styles/OnboardingWrapper.css';
 
@@ -9,20 +10,26 @@ const ONBOARDING_STEPS = [
   {
     id: 'contact',
     title: 'Contact Information',
-    description: 'Step 1 of 3',
+    description: 'Step 1 of 4',
     component: StudentInfo,
   },
   {
     id: 'availability',
     title: 'Availability',
-    description: 'Step 2 of 3',
+    description: 'Step 2 of 4',
     component: Availability,
   },
   {
     id: 'classes',
     title: 'Classes',
-    description: 'Step 3 of 3',
+    description: 'Step 3 of 4',
     component: Classes,
+  },
+  {
+    id: 'locations',
+    title: 'Study Spots',
+    description: 'Step 4 of 4',
+    component: StudyLocations,
   },
 ];
 
