@@ -109,7 +109,11 @@ function App() {
 
         {page === 'profile' ? (
           hasProfile ? (
-            <ProfilePage userId={user.id} onProfileUpdated={() => checkProfile(user.id)} />
+            <ProfilePage
+              userId={user.id}
+              onProfileUpdated={() => checkProfile(user.id)}
+              onGoToOnboarding={() => setPage('onboarding')}
+            />
           ) : (
             <OnboardingWrapper
               userId={user.id}
