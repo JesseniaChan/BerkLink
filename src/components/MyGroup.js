@@ -52,7 +52,7 @@ export default function MyGroup({ userId }) {
         const { data: studentDetails } = memberIds.length > 0
           ? await supabase
             .from('students')
-            .select('user_id, instagram, phone, classes, availability_dates, google_calendar_connected')
+            .select('user_id, first_name, last_name, instagram, phone, classes, availability_dates, google_calendar_connected')
             .in('user_id', memberIds)
           : { data: [] };
 
@@ -103,7 +103,8 @@ export default function MyGroup({ userId }) {
         .in('class_code', classes)
       : { data: [] };
 
-    const potentialGroups = await enrichGroups(potentialGroupDetails || []);
+    const allPotentialGroups = await enrichGroups(potentialGroupDetails || []);
+    const potentialGroups = allPotentialGroups.filter((g) => !g.isUserMember);
     const groupedPotentialGroups = potentialGroups.reduce((acc, group) => {
       const classCode = group.class_code || 'Other';
       if (!acc[classCode]) acc[classCode] = [];
@@ -237,6 +238,11 @@ export default function MyGroup({ userId }) {
       .join(' · ');
   }
 
+  function memberDisplayName(member) {
+    const full = [member.first_name, member.last_name].filter(Boolean).join(' ');
+    return full || member.instagram || 'unknown';
+  }
+
   function renderMemberCard(member) {
     return (
       <div
@@ -245,9 +251,10 @@ export default function MyGroup({ userId }) {
         onClick={() => member.user_id !== userId && setSelectedMember(member)}
       >
         <div className="m-avatar">
-          {member.instagram?.[0]?.toUpperCase() || '?'}
+          {(member.first_name || member.instagram)?.[0]?.toUpperCase() || '?'}
           {member.user_id === userId && <span className="you-tag">YOU</span>}
         </div>
+        <div className="m-name">{memberDisplayName(member)}</div>
         <div className="m-handle">@{member.instagram || 'unknown'}</div>
         {member.classes && member.classes.length > 0 && (
           <div className="m-class">{member.classes[0]}</div>
@@ -259,8 +266,13 @@ export default function MyGroup({ userId }) {
     );
   }
 
+  async function joinGroup(groupId) {
+    await supabase.from('group_members').insert({ group_id: groupId, user_id: userId });
+    fetchMyGroups();
+  }
+
   function renderGroupCard(group, options = {}) {
-    const { canLeave = false, showCalendarSync = false } = options;
+    const { canLeave = false, showCalendarSync = false, canJoin = false } = options;
 
     return (
       <div key={group.id} className={`group-card ${group.isUserMember ? 'is-member' : 'is-potential'}`}>
@@ -295,6 +307,11 @@ export default function MyGroup({ userId }) {
           </div>
           <div className="group-header-right">
             <span className="member-count-badge">{group.members.length} members</span>
+            {canJoin && (
+              <button className="join-btn" onClick={() => joinGroup(group.id)}>
+                Join
+              </button>
+            )}
             {canLeave && (
               <button className="leave-btn" onClick={() => leaveGroup(group.id)}>
                 Leave
@@ -327,9 +344,10 @@ export default function MyGroup({ userId }) {
             <button className="modal-close" onClick={() => setSelectedMember(null)}>X</button>
 
             <div className="modal-avatar">
-              {selectedMember.instagram?.[0]?.toUpperCase() || '?'}
+              {(selectedMember.first_name || selectedMember.instagram)?.[0]?.toUpperCase() || '?'}
             </div>
-            <h2 className="modal-name">@{selectedMember.instagram}</h2>
+            <h2 className="modal-name">{memberDisplayName(selectedMember)}</h2>
+            <div className="modal-instagram">@{selectedMember.instagram}</div>
 
             <div className="modal-section">
               <h4>Contact</h4>
@@ -447,7 +465,7 @@ export default function MyGroup({ userId }) {
                     </div>
                   ) : (
                     <div className="class-groups-scroll">
-                      {classGroups.map((group) => renderGroupCard(group))}
+                      {classGroups.map((group) => renderGroupCard(group, { canJoin: true }))}
                     </div>
                   )}
                 </section>
