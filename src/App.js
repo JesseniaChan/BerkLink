@@ -8,6 +8,7 @@ import ResetPasswordForm from './components/ResetPasswordForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
 import ProfilePage from './components/ProfilePage';
 import MyGroup from './components/MyGroup';
+import Friends from './components/Friends';
 
 function App() {
   const [authForm, setAuthForm] = useState('login'); // 'login', 'signup', 'forgotPassword', 'resetPassword'
@@ -101,6 +102,12 @@ function App() {
             >
               My Groups
             </button>
+            <button
+              className={`nav-btn ${page === 'friends' ? 'active' : ''}`}
+              onClick={() => setPage('friends')}
+            >
+              Friends
+            </button>
             <button className="nav-btn signout" onClick={() => supabase.auth.signOut()}>
               Sign Out
             </button>
@@ -125,6 +132,8 @@ function App() {
             userId={user.id}
             onComplete={() => handleOnboardingComplete('mygroup')}
           />
+        ) : page === 'friends' ? (
+          <Friends userId={user.id} />
         ) : (
           <MyGroup userId={user.id} />
         )}
