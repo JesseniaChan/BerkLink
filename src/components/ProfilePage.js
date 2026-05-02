@@ -91,6 +91,8 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [instagram, setInstagram] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedClasses, setSelectedClasses] = useState([]);
@@ -140,6 +142,8 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
 
   useEffect(() => {
     if (profile && editMode) {
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
       setInstagram(profile.instagram || '');
       setPhone(formatPhone(profile.phone || ''));
       const classes = normalizeClassList(Array.isArray(profile.classes) ? profile.classes : []);
@@ -370,6 +374,8 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
     try {
       setSaving(true);
       const savedData = await saveOnboardingStep(userId, {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         instagram: instagram.trim().toLowerCase(),
         phone: normalizePhone(phone),
         classes: normalizeClassList(selectedClasses),
@@ -425,10 +431,17 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
           {/* Hero */}
           <div className="profile-hero">
             <div className="hero-avatar">
-              {profile?.instagram?.[0]?.toUpperCase() || '?'}
+              {profile?.first_name?.[0]?.toUpperCase() || profile?.instagram?.[0]?.toUpperCase() || '?'}
             </div>
             <div className="hero-info">
-              <div className="hero-name">@{profile?.instagram || 'unknown'}</div>
+              <div className="hero-name">
+                {profile?.first_name || profile?.last_name
+                  ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+                  : profile?.instagram || 'unknown'}
+              </div>
+              {profile?.instagram && (
+                <div className="hero-instagram">@{profile.instagram}</div>
+              )}
               <div className="hero-badges">
                 {(profile?.classes || []).map((cls) => (
                   <span key={cls} className="hero-badge">{cls}</span>
@@ -628,6 +641,29 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
             <h2>Edit Profile</h2>
           </div>
           <form onSubmit={handleSave} className="profile-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="firstName">First Name</label>
+                <input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First"
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="lastName">Last Name</label>
+                <input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
             <div className="form-group">
               <label htmlFor="instagram">Instagram Handle</label>
               <input

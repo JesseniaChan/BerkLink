@@ -213,6 +213,23 @@
   color: rgba(255,255,255,0.5);
 }
 
+.join-btn {
+  background: var(--gold);
+  border: none;
+  border-radius: 8px;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.join-btn:hover {
+  background: #e6a000;
+}
+
 .leave-btn {
   background: rgba(255,255,255,0.1);
   border: 1px solid rgba(255,255,255,0.25);
@@ -301,10 +318,16 @@
   font-family: 'Syne', sans-serif;
 }
 
-.m-handle {
+.m-name {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
+}
+
+.m-handle {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text2);
 }
 
 .m-class {
@@ -448,6 +471,13 @@
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--blue);
+  margin-bottom: 2px;
+}
+
+.modal-instagram {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text2);
   margin-bottom: 1.5rem;
 }
 

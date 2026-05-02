@@ -69,6 +69,12 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: white;
+  margin-bottom: 2px;
+}
+
+.hero-instagram {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.75);
   margin-bottom: 8px;
 }
 
@@ -605,6 +611,12 @@
 .profile-form {
   display: grid;
   gap: 22px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .form-group {

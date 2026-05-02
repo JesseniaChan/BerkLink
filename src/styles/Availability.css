@@ -3,7 +3,7 @@
   justify-content: center;
   align-items: flex-start;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-mid) 100%);
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -75,7 +75,7 @@
 }
 
 .month-nav-button {
-  background: #667eea;
+  background: var(--blue);
   color: white;
   border: none;
   border-radius: 6px;
@@ -90,7 +90,7 @@
 }
 
 .month-nav-button:hover:not(:disabled) {
-  background: #764ba2;
+  background: var(--blue-mid);
   transform: scale(1.1);
 }
 
@@ -115,10 +115,10 @@
 .calendar-day-header {
   text-align: center;
   font-weight: 600;
-  color: #667eea;
+  color: var(--blue);
   font-size: 12px;
   padding: 10px 5px;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid var(--blue);
 }
 
 .calendar-day {
@@ -138,8 +138,8 @@
 }
 
 .calendar-day:hover:not(.empty) {
-  border-color: #667eea;
-  background: #f0f0ff;
+  border-color: var(--blue);
+  background: var(--blue-light);
   transform: scale(1.05);
 }
 
@@ -150,24 +150,24 @@
 }
 
 .calendar-day.selected {
-  background: #667eea;
+  background: var(--blue);
   color: white;
-  border-color: #667eea;
+  border-color: var(--blue);
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 50, 98, 0.3);
 }
 
 .calendar-day.active {
-  outline: 3px solid #764ba2;
+  outline: 3px solid var(--blue-mid);
   outline-offset: 2px;
 }
 
 .calendar-day.selected.active {
-  background: #764ba2;
-  border-color: #764ba2;
-  outline: 3px solid #4a2f7a;
+  background: var(--blue-mid);
+  border-color: var(--blue-mid);
+  outline: 3px solid var(--blue);
   outline-offset: 2px;
-  box-shadow: 0 4px 12px rgba(118, 75, 162, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 50, 98, 0.4);
 }
 
 /* Time Zones Panel */
@@ -216,13 +216,13 @@
 }
 
 .timezone-select:hover {
-  border-color: #667eea;
+  border-color: var(--blue);
 }
 
 .timezone-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0, 50, 98, 0.1);
 }
 
 /* Time Slots Container */
@@ -267,11 +267,11 @@
 .timezone-header {
   margin-bottom: 12px;
   padding-bottom: 10px;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid var(--blue);
 }
 
 .timezone-time {
-  color: #667eea;
+  color: var(--blue);
   font-size: 13px;
   font-weight: 700;
   margin: 0;
@@ -299,14 +299,14 @@
 }
 
 .time-slot-checkbox:hover input:not(:disabled) {
-  border-color: #667eea;
+  border-color: var(--blue);
 }
 
 .time-slot-checkbox input {
   cursor: pointer;
   width: 16px;
   height: 16px;
-  accent-color: #667eea;
+  accent-color: var(--blue);
   flex-shrink: 0;
 }
 
@@ -331,21 +331,21 @@
 }
 
 .time-slot-checkbox input:checked ~ .time-slot-display {
-  color: #667eea;
+  color: var(--blue);
   font-weight: 600;
 }
 
 /* Summary and Messages */
 .selection-summary {
-  background: #e8f4f8;
-  border-left: 4px solid #3498db;
+  background: var(--blue-light);
+  border-left: 4px solid var(--blue);
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 25px;
 }
 
 .summary-text {
-  color: #2980b9;
+  color: var(--blue-mid);
   font-size: 13px;
   margin: 0;
   line-height: 1.6;
@@ -394,8 +394,8 @@
 }
 
 .info-note {
-  background-color: #e8f4f8;
-  border-left: 4px solid #3498db;
+  background-color: var(--blue-light);
+  border-left: 4px solid var(--blue);
   padding: 12px 14px;
   border-radius: 8px;
   margin-top: 20px;
@@ -406,13 +406,13 @@
 .note-icon {
   font-size: 18px;
   font-weight: bold;
-  color: #3498db;
+  color: var(--blue);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .info-note p {
-  color: #2980b9;
+  color: var(--blue-mid);
   font-size: 13px;
   margin: 0;
   line-height: 1.5;
@@ -422,7 +422,7 @@
   width: 100%;
   margin-top: 14px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(135deg, var(--blue-mid) 0%, var(--blue) 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -435,7 +435,7 @@
 
 .paste-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(118, 75, 162, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 50, 98, 0.4);
 }
 
 .paste-button:disabled {
@@ -452,7 +452,7 @@
 .next-button {
   flex: 1;
   padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-mid) 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -464,7 +464,7 @@
 
 .next-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 50, 98, 0.4);
 }
 
 .next-button:disabled {
@@ -544,9 +544,9 @@
 }
 
 .avail-tab.active {
-  background: #667eea;
+  background: var(--blue);
   color: white;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 50, 98, 0.35);
 }
 
 /* ── WEEKLY TAB ── */
@@ -597,7 +597,7 @@
 }
 
 .wg-day-header.has-selection {
-  color: #667eea;
+  color: var(--blue);
 }
 
 .wg-time-label {
@@ -626,15 +626,15 @@
 }
 
 .wg-cell:hover {
-  background: #e8ecff;
+  background: var(--blue-light);
 }
 
 .wg-cell.selected {
-  background: #667eea;
+  background: var(--blue);
 }
 
 .wg-cell.selected:hover {
-  background: #5a70d8;
+  background: var(--blue-mid);
 }
 
 /* Weekly summary bar */
@@ -645,16 +645,16 @@
   gap: 12px;
   margin-top: 12px;
   padding: 10px 14px;
-  background: #eef0ff;
-  border-left: 4px solid #667eea;
+  background: var(--blue-light);
+  border-left: 4px solid var(--blue);
   border-radius: 8px;
   font-size: 13px;
-  color: #4a56b0;
+  color: var(--blue);
   flex-wrap: wrap;
 }
 
 .weekly-summary-note {
-  color: #764ba2;
+  color: var(--blue-mid);
   font-weight: 600;
 }
 
