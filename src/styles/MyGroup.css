@@ -559,6 +559,42 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* ── MATCH SCORE BADGE ── */
+.match-score-badge {
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.match-score-high {
+  background: var(--gold);
+  color: var(--blue);
+}
+
+.match-score-med {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+.match-score-low {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.match-score-none {
+  background: rgba(220, 53, 69, 0.25);
+  color: #ffb3b3;
+}
+
+.match-score-cancelled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
+  text-decoration: line-through;
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .group-card-header {
