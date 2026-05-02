@@ -11,6 +11,18 @@ const DEFAULT_CLASSES = [
   'DATA100',
 ];
 
+const PRESET_LOCATIONS = [
+  'Moffitt 4th',
+  'Doe Library',
+  'Soda 380',
+  'Evans Hall',
+  'Main Stacks',
+  'Valley LSB',
+  'Cory 299',
+];
+
+const MAX_LOCATIONS = 3;
+
 const TIME_SLOTS = [
   '8:00 AM',
   '9:00 AM',
@@ -75,7 +87,7 @@ const validatePhone = (value) => normalizePhone(value).length === 10;
 const normalizeClassName = (value = '') => value.replace(/\s+/g, '').toUpperCase().trim();
 const normalizeClassList = (classes = []) => [...new Set(classes.map((className) => normalizeClassName(className)).filter(Boolean))];
 
-export default function ProfilePage({ userId, onProfileUpdated }) {
+export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
@@ -92,6 +104,10 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   const [saving, setSaving] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [gridMode, setGridMode] = useState(false);
+  const [preferredLocations, setPreferredLocations] = useState([]);
+  const [locCustomInput, setLocCustomInput] = useState('');
+  const [locShaking, setLocShaking] = useState(false);
+  const [locLimitMsg, setLocLimitMsg] = useState('');
   const isDraggingRef = useRef(false);
   const dragActionRef = useRef(null);
   const draggedCells = useRef(new Set());
@@ -116,6 +132,13 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
   }, [userId]);
 
   useEffect(() => {
+    if (profile?.availability_dates) {
+      const firstKey = Object.keys(profile.availability_dates).sort()[0];
+      if (firstKey) setAvailCalDate(new Date(`${firstKey}T00:00:00`));
+    }
+  }, [profile]);
+
+  useEffect(() => {
     if (profile && editMode) {
       setInstagram(profile.instagram || '');
       setPhone(formatPhone(profile.phone || ''));
@@ -124,6 +147,9 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
       setSelectedDates(profile.availability_dates || {});
       setActiveDateKey(Object.keys(profile.availability_dates || {})[0] || '');
       setSelectedTimeZone('PT');
+      setPreferredLocations(Array.isArray(profile.preferred_locations) ? profile.preferred_locations : []);
+      setLocCustomInput('');
+      setLocLimitMsg('');
       setError('');
       setSuccess('');
     }
@@ -153,6 +179,41 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
   const removeCustomClass = (className) => {
     setSelectedClasses((prev) => prev.filter((c) => c !== className));
+  };
+
+  const triggerLocShake = () => {
+    setLocLimitMsg('Pick up to 3');
+    setLocShaking(true);
+    setTimeout(() => setLocShaking(false), 600);
+  };
+
+  const toggleLocation = (loc) => {
+    if (preferredLocations.includes(loc)) {
+      setPreferredLocations(preferredLocations.filter((l) => l !== loc));
+      setLocLimitMsg('');
+    } else if (preferredLocations.length >= MAX_LOCATIONS) {
+      triggerLocShake();
+    } else {
+      setPreferredLocations([...preferredLocations, loc]);
+      setLocLimitMsg('');
+    }
+  };
+
+  const addCustomLocation = () => {
+    const val = locCustomInput.trim();
+    if (!val) return;
+    if (preferredLocations.includes(val)) {
+      setLocCustomInput('');
+      return;
+    }
+    if (preferredLocations.length >= MAX_LOCATIONS) {
+      triggerLocShake();
+      setLocCustomInput('');
+      return;
+    }
+    setPreferredLocations([...preferredLocations, val]);
+    setLocCustomInput('');
+    setLocLimitMsg('');
   };
 
   const handleConnectGoogleCalendar = async () => {
@@ -276,6 +337,10 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
   const sortedDates = Object.keys(selectedDates).sort();
 
+  const [availViewMode, setAvailViewMode] = useState('calendar');
+  const [availCalDate, setAvailCalDate] = useState(() => new Date());
+  const [availCalSelected, setAvailCalSelected] = useState('');
+
   const handleSave = async (e) => {
     e.preventDefault();
     setError('');
@@ -309,6 +374,7 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
         phone: normalizePhone(phone),
         classes: normalizeClassList(selectedClasses),
         availability_dates: selectedDates,
+        preferred_locations: preferredLocations,
       });
 
       setProfile(savedData);
@@ -337,7 +403,9 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
     return (
       <div className="profile-page">
         <div className="profile-card">
-          <h2>Your Profile</h2>
+          <div className="profile-header">
+            <h2>Your Profile</h2>
+          </div>
           <p className="profile-empty">No profile data found yet.</p>
           <button className="edit-profile-button" onClick={() => setEditMode(true)}>
             Create Profile
@@ -349,72 +417,216 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
 
   return (
     <div className="profile-page">
-      <div className="profile-card">
-        <div className="profile-header">
-          <h2>Your Profile</h2>
-          {!editMode && (
-            <button className="edit-profile-button" onClick={() => setEditMode(true)}>
-              Edit Profile
-            </button>
-          )}
-        </div>
+      {success && <div className="success-message">{success}</div>}
+      {error && <div className="error-message">{error}</div>}
 
-        {success && <div className="success-message">{success}</div>}
-        {error && <div className="error-message">{error}</div>}
-
-        {!editMode ? (
-          <div className="profile-summary">
-            <div className="profile-field">
-              <span className="field-label">Instagram</span>
-              <span className="field-value">{profile?.instagram || 'Not set'}</span>
+      {!editMode ? (
+        <>
+          {/* Hero */}
+          <div className="profile-hero">
+            <div className="hero-avatar">
+              {profile?.instagram?.[0]?.toUpperCase() || '?'}
             </div>
-            <div className="profile-field">
-              <span className="field-label">Phone</span>
-              <span className="field-value">{profile?.phone ? formatPhone(profile.phone) : 'Not set'}</span>
-            </div>
-            <div className="profile-field">
-              <span className="field-label">Calendar Sync</span>
-              <div className="field-value">
-                <span>{googleConnected ? 'Connected to Google Calendar' : 'Not connected'}</span>
-                <button
-                  type="button"
-                  className="connect-calendar-button"
-                  onClick={handleConnectGoogleCalendar}
-                  disabled={saving}
-                >
-                  {googleConnected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-                </button>
+            <div className="hero-info">
+              <div className="hero-name">@{profile?.instagram || 'unknown'}</div>
+              <div className="hero-badges">
+                {(profile?.classes || []).map((cls) => (
+                  <span key={cls} className="hero-badge">{cls}</span>
+                ))}
               </div>
             </div>
-            <div className="profile-field">
-              <span className="field-label">Classes</span>
-              {profile?.classes?.length > 0 ? (
-                <div className="profile-tags">
-                  {profile.classes.map((className) => (
-                    <span className="profile-tag" key={className}>{className}</span>
-                  ))}
+            <button className="edit-btn" onClick={() => setEditMode(true)}>
+              Edit Profile
+            </button>
+          </div>
+
+          {/* Contact + Classes */}
+          <div className="section-grid">
+            <div className="card">
+              <div className="card-label">Contact</div>
+              {profile?.instagram && (
+                <div className="contact-row">
+                  <div className="contact-icon ig">📸</div>
+                  <div>
+                    <div className="contact-label">Instagram</div>
+                    <div className="contact-value">@{profile.instagram}</div>
+                  </div>
                 </div>
-              ) : (
-                <span className="field-value">Not set</span>
+              )}
+              {profile?.phone && (
+                <div className="contact-row">
+                  <div className="contact-icon ph">📞</div>
+                  <div>
+                    <div className="contact-label">Phone</div>
+                    <div className="contact-value">{formatPhone(profile.phone)}</div>
+                  </div>
+                </div>
               )}
             </div>
-            <div className="profile-field availability-summary">
-              <span className="field-label">Availability</span>
-              {profile?.availability_dates && Object.keys(profile.availability_dates).length > 0 ? (
-                <div className="availability-list">
-                  {Object.entries(profile.availability_dates).map(([dateKey, times]) => (
-                    <div key={dateKey} className="availability-item">
-                      <strong>{formatDateLabel(dateKey)}:</strong>{' '}
-                      {times.length > 0 ? times.join(', ') : 'No times selected'}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <span className="field-value">Not set</span>
-              )}
+
+            <div className="card">
+              <div className="card-label">Classes</div>
+              <div className="classes-wrap">
+                {(profile?.classes || []).map((cls) => (
+                  <span key={cls} className="class-pill">{cls}</span>
+                ))}
+              </div>
             </div>
           </div>
-        ) : (
+
+          {/* Preferred Locations */}
+          {(profile?.preferred_locations || []).length > 0 && (
+            <div className="card pref-loc-view-card">
+              <div className="card-label">Favorite Study Spots</div>
+              <div className="pref-loc-view-chips">
+                {profile.preferred_locations.map((loc) => (
+                  <span key={loc} className="pref-loc-view-chip">{loc}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Calendar Sync */}
+          <div className="calendar-card">
+            <div className="calendar-left">
+              <div className="cal-icon">📅</div>
+              <div>
+                <div className="cal-title">Google Calendar Sync</div>
+                <div className="cal-sub">
+                  {googleConnected
+                    ? 'Connected to Google Calendar'
+                    : 'Connect to auto-import your availability'}
+                </div>
+              </div>
+            </div>
+            <button className="cal-btn" onClick={handleConnectGoogleCalendar} disabled={saving}>
+              {saving ? 'Connecting...' : googleConnected ? 'Reconnect Calendar' : 'Connect Calendar'}
+            </button>
+          </div>
+
+          {/* Availability */}
+          {profile?.availability_dates && Object.keys(profile.availability_dates).length > 0 && (
+            <div className="card avail-card">
+              <div className="avail-card-header">
+                <div className="card-label">Availability</div>
+                <div className="avail-view-toggle">
+                  <button
+                    type="button"
+                    className={`avail-view-btn${availViewMode === 'list' ? ' active' : ''}`}
+                    onClick={() => setAvailViewMode('list')}
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    className={`avail-view-btn${availViewMode === 'calendar' ? ' active' : ''}`}
+                    onClick={() => {
+                      setAvailViewMode('calendar');
+                      const firstKey = Object.keys(profile.availability_dates).sort()[0];
+                      if (firstKey) setAvailCalDate(new Date(`${firstKey}T00:00:00`));
+                      setAvailCalSelected('');
+                    }}
+                  >
+                    Calendar
+                  </button>
+                </div>
+              </div>
+
+              {availViewMode === 'list' ? (
+                <div className="avail-list">
+                  {Object.entries(profile.availability_dates)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([dateKey, times]) => (
+                      <div key={dateKey} className="avail-row">
+                        <div className="avail-date">{formatDateLabel(dateKey)}</div>
+                        <div className="avail-times">
+                          {(times || []).length > 0
+                            ? times.map((t) => <span key={t} className="time-chip">{t}</span>)
+                            : <span className="no-times">No times set</span>}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="avail-cal-wrapper">
+                  <div className="avail-cal-left">
+                    <div className="avail-cal-nav">
+                      <button
+                        type="button"
+                        className="avail-cal-arrow"
+                        onClick={() => setAvailCalDate(new Date(availCalDate.getFullYear(), availCalDate.getMonth() - 1, 1))}
+                      >←</button>
+                      <span className="avail-cal-month">{MONTHS[availCalDate.getMonth()]} {availCalDate.getFullYear()}</span>
+                      <button
+                        type="button"
+                        className="avail-cal-arrow"
+                        onClick={() => setAvailCalDate(new Date(availCalDate.getFullYear(), availCalDate.getMonth() + 1, 1))}
+                      >→</button>
+                    </div>
+                    <div className="avail-cal-grid">
+                      {DAYS_OF_WEEK.map((d) => (
+                        <div key={d} className="avail-cal-day-hdr">{d}</div>
+                      ))}
+                      {Array.from({ length: getFirstDayOfMonth(availCalDate) }).map((_, i) => (
+                        <div key={`e-${i}`} className="avail-cal-day empty" />
+                      ))}
+                      {Array.from({ length: getDaysInMonth(availCalDate) }).map((_, i) => {
+                        const dayNum = i + 1;
+                        const dateKey = formatDateKey(new Date(availCalDate.getFullYear(), availCalDate.getMonth(), dayNum));
+                        const hasAvail = !!(profile.availability_dates[dateKey]?.length);
+                        const isSelected = availCalSelected === dateKey;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            className={`avail-cal-day${hasAvail ? ' has-avail' : ''}${isSelected ? ' selected' : ''}`}
+                            onClick={() => hasAvail && setAvailCalSelected(isSelected ? '' : dateKey)}
+                          >
+                            {dayNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="avail-cal-legend">
+                      <span className="avail-cal-legend-dot" /> Available dates
+                    </div>
+                  </div>
+                  <div className="avail-cal-right">
+                    {availCalSelected && profile.availability_dates[availCalSelected] ? (
+                      <>
+                        <div className="avail-cal-times-label">{formatDateLabel(availCalSelected)}</div>
+                        <div className="avail-times">
+                          {profile.availability_dates[availCalSelected].map((t) => (
+                            <span key={t} className="time-chip">{t}</span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="avail-cal-side-empty">
+                        <span className="avail-cal-legend-dot" />
+                        <span>Select a highlighted date to see times</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Dev shortcut */}
+          {onGoToOnboarding && (
+            <div className="onboarding-preview-row">
+              <button className="onboarding-preview-btn" onClick={onGoToOnboarding}>
+                Preview Onboarding Flow →
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="profile-card">
+          <div className="profile-header">
+            <h2>Edit Profile</h2>
+          </div>
           <form onSubmit={handleSave} className="profile-form">
             <div className="form-group">
               <label htmlFor="instagram">Instagram Handle</label>
@@ -463,6 +675,53 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
                       <span>{className}</span>
                       <button type="button" onClick={() => removeCustomClass(className)} disabled={saving}>×</button>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Favorite Study Spots</label>
+              <p className="pref-loc-form-hint">Pick up to 3</p>
+              {locLimitMsg && <div className="pref-loc-limit-msg-inline">{locLimitMsg}</div>}
+              <div className={`pref-loc-form-chips${locShaking ? ' pref-loc-shake' : ''}`}>
+                {PRESET_LOCATIONS.map((loc) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    className={`pref-loc-form-chip${preferredLocations.includes(loc) ? ' selected' : ''}`}
+                    onClick={() => toggleLocation(loc)}
+                    disabled={saving}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+              <div className="pref-loc-form-custom">
+                <input
+                  type="text"
+                  placeholder="Or type your own spot..."
+                  value={locCustomInput}
+                  onChange={(e) => setLocCustomInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomLocation(); } }}
+                  disabled={saving}
+                  maxLength={50}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomLocation}
+                  disabled={saving || !locCustomInput.trim()}
+                >
+                  Add
+                </button>
+              </div>
+              {preferredLocations.filter((l) => !PRESET_LOCATIONS.includes(l)).length > 0 && (
+                <div className="pref-loc-custom-list">
+                  {preferredLocations.filter((l) => !PRESET_LOCATIONS.includes(l)).map((loc) => (
+                    <span key={loc} className="pref-loc-custom-tag">
+                      {loc}
+                      <button type="button" onClick={() => toggleLocation(loc)} disabled={saving}>×</button>
+                    </span>
                   ))}
                 </div>
               )}
@@ -612,8 +871,8 @@ export default function ProfilePage({ userId, onProfileUpdated }) {
               </button>
             </div>
           </form>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,18 +3,27 @@ import './App.css';
 import { supabase } from './supabaseClient';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
+import ForgotPasswordForm from './components/ForgotPasswordForm';
+import ResetPasswordForm from './components/ResetPasswordForm';
 import OnboardingWrapper from './components/OnboardingWrapper';
 import ProfilePage from './components/ProfilePage';
 import MyGroup from './components/MyGroup';
+import Friends from './components/Friends';
 
 function App() {
-  const [isLogin, setIsLogin] = useState(false);
+  const [authForm, setAuthForm] = useState('login'); // 'login', 'signup', 'forgotPassword', 'resetPassword'
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
   const [page, setPage] = useState('onboarding');
 
   useEffect(() => {
+    // Check for recovery token in URL (when user clicks reset link in email)
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setAuthForm('resetPassword');
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -59,6 +68,11 @@ function App() {
     setPage(redirectPage);
   };
 
+  const handleResetPasswordComplete = () => {
+    // After password reset, switch to login form
+    setAuthForm('login');
+  };
+
   if (loading) {
     return (
       <div className="App loading-container">
@@ -71,7 +85,10 @@ function App() {
     return (
       <div className="App">
         <nav className="app-nav">
-          <span className="nav-brand">◈ BerkLink</span>
+          <div className="nav-logo">
+            <div className="logo-mark"><span>B</span></div>
+            <span className="logo-text">Berk<span className="gold">Link</span></span>
+          </div>
           <div className="nav-links">
             <button
               className={`nav-btn ${page === 'profile' ? 'active' : ''}`}
@@ -85,6 +102,12 @@ function App() {
             >
               My Groups
             </button>
+            <button
+              className={`nav-btn ${page === 'friends' ? 'active' : ''}`}
+              onClick={() => setPage('friends')}
+            >
+              Friends
+            </button>
             <button className="nav-btn signout" onClick={() => supabase.auth.signOut()}>
               Sign Out
             </button>
@@ -93,7 +116,11 @@ function App() {
 
         {page === 'profile' ? (
           hasProfile ? (
-            <ProfilePage userId={user.id} onProfileUpdated={() => checkProfile(user.id)} />
+            <ProfilePage
+              userId={user.id}
+              onProfileUpdated={() => checkProfile(user.id)}
+              onGoToOnboarding={() => setPage('onboarding')}
+            />
           ) : (
             <OnboardingWrapper
               userId={user.id}
@@ -105,6 +132,8 @@ function App() {
             userId={user.id}
             onComplete={() => handleOnboardingComplete('mygroup')}
           />
+        ) : page === 'friends' ? (
+          <Friends userId={user.id} />
         ) : (
           <MyGroup userId={user.id} />
         )}
@@ -114,10 +143,23 @@ function App() {
 
   return (
     <div className="App">
-      {isLogin ? (
-        <LoginForm onSwitchToSignup={() => setIsLogin(false)} />
-      ) : (
-        <SignupForm onSwitchToLogin={() => setIsLogin(true)} />
+      {authForm === 'login' && (
+        <LoginForm
+          onSwitchToSignup={() => setAuthForm('signup')}
+          onSwitchToForgotPassword={() => setAuthForm('forgotPassword')}
+        />
+      )}
+      {authForm === 'signup' && (
+        <SignupForm onSwitchToLogin={() => setAuthForm('login')} />
+      )}
+      {authForm === 'forgotPassword' && (
+        <ForgotPasswordForm onSwitchToLogin={() => setAuthForm('login')} />
+      )}
+      {authForm === 'resetPassword' && (
+        <ResetPasswordForm
+          onResetComplete={handleResetPasswordComplete}
+          onSwitchToLogin={() => setAuthForm('login')}
+        />
       )}
     </div>
   );

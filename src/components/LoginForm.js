@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import '../styles/LoginForm.css';
 
-export default function LoginForm({ onSwitchToSignup }) {
+export default function LoginForm({ onSwitchToSignup, onSwitchToForgotPassword }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -125,9 +125,13 @@ export default function LoginForm({ onSwitchToSignup }) {
         </form>
 
         <div className="form-footer">
-          <a href="/forgot-password" className="forgot-password-link">
+          <button
+            type="button"
+            onClick={onSwitchToForgotPassword}
+            className="forgot-password-link"
+          >
             Forgot your password?
-          </a>
+          </button>
         </div>
 
         <p className="signup-link">
