@@ -11,6 +11,18 @@ const DEFAULT_CLASSES = [
   'DATA100',
 ];
 
+const PRESET_LOCATIONS = [
+  'Moffitt 4th',
+  'Doe Library',
+  'Soda 380',
+  'Evans Hall',
+  'Main Stacks',
+  'Valley LSB',
+  'Cory 299',
+];
+
+const MAX_LOCATIONS = 3;
+
 const TIME_SLOTS = [
   '8:00 AM',
   '9:00 AM',
@@ -94,6 +106,10 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
   const [saving, setSaving] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [gridMode, setGridMode] = useState(false);
+  const [preferredLocations, setPreferredLocations] = useState([]);
+  const [locCustomInput, setLocCustomInput] = useState('');
+  const [locShaking, setLocShaking] = useState(false);
+  const [locLimitMsg, setLocLimitMsg] = useState('');
   const isDraggingRef = useRef(false);
   const dragActionRef = useRef(null);
   const draggedCells = useRef(new Set());
@@ -135,6 +151,9 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
       setSelectedDates(profile.availability_dates || {});
       setActiveDateKey(Object.keys(profile.availability_dates || {})[0] || '');
       setSelectedTimeZone('PT');
+      setPreferredLocations(Array.isArray(profile.preferred_locations) ? profile.preferred_locations : []);
+      setLocCustomInput('');
+      setLocLimitMsg('');
       setError('');
       setSuccess('');
     }
@@ -164,6 +183,41 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
 
   const removeCustomClass = (className) => {
     setSelectedClasses((prev) => prev.filter((c) => c !== className));
+  };
+
+  const triggerLocShake = () => {
+    setLocLimitMsg('Pick up to 3');
+    setLocShaking(true);
+    setTimeout(() => setLocShaking(false), 600);
+  };
+
+  const toggleLocation = (loc) => {
+    if (preferredLocations.includes(loc)) {
+      setPreferredLocations(preferredLocations.filter((l) => l !== loc));
+      setLocLimitMsg('');
+    } else if (preferredLocations.length >= MAX_LOCATIONS) {
+      triggerLocShake();
+    } else {
+      setPreferredLocations([...preferredLocations, loc]);
+      setLocLimitMsg('');
+    }
+  };
+
+  const addCustomLocation = () => {
+    const val = locCustomInput.trim();
+    if (!val) return;
+    if (preferredLocations.includes(val)) {
+      setLocCustomInput('');
+      return;
+    }
+    if (preferredLocations.length >= MAX_LOCATIONS) {
+      triggerLocShake();
+      setLocCustomInput('');
+      return;
+    }
+    setPreferredLocations([...preferredLocations, val]);
+    setLocCustomInput('');
+    setLocLimitMsg('');
   };
 
   const handleConnectGoogleCalendar = async () => {
@@ -326,6 +380,7 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
         phone: normalizePhone(phone),
         classes: normalizeClassList(selectedClasses),
         availability_dates: selectedDates,
+        preferred_locations: preferredLocations,
       });
 
       setProfile(savedData);
@@ -431,6 +486,18 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
               </div>
             </div>
           </div>
+
+          {/* Preferred Locations */}
+          {(profile?.preferred_locations || []).length > 0 && (
+            <div className="card pref-loc-view-card">
+              <div className="card-label">Favorite Study Spots</div>
+              <div className="pref-loc-view-chips">
+                {profile.preferred_locations.map((loc) => (
+                  <span key={loc} className="pref-loc-view-chip">{loc}</span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Calendar Sync */}
           <div className="calendar-card">
@@ -644,6 +711,53 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
                       <span>{className}</span>
                       <button type="button" onClick={() => removeCustomClass(className)} disabled={saving}>×</button>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Favorite Study Spots</label>
+              <p className="pref-loc-form-hint">Pick up to 3</p>
+              {locLimitMsg && <div className="pref-loc-limit-msg-inline">{locLimitMsg}</div>}
+              <div className={`pref-loc-form-chips${locShaking ? ' pref-loc-shake' : ''}`}>
+                {PRESET_LOCATIONS.map((loc) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    className={`pref-loc-form-chip${preferredLocations.includes(loc) ? ' selected' : ''}`}
+                    onClick={() => toggleLocation(loc)}
+                    disabled={saving}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+              <div className="pref-loc-form-custom">
+                <input
+                  type="text"
+                  placeholder="Or type your own spot..."
+                  value={locCustomInput}
+                  onChange={(e) => setLocCustomInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomLocation(); } }}
+                  disabled={saving}
+                  maxLength={50}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomLocation}
+                  disabled={saving || !locCustomInput.trim()}
+                >
+                  Add
+                </button>
+              </div>
+              {preferredLocations.filter((l) => !PRESET_LOCATIONS.includes(l)).length > 0 && (
+                <div className="pref-loc-custom-list">
+                  {preferredLocations.filter((l) => !PRESET_LOCATIONS.includes(l)).map((loc) => (
+                    <span key={loc} className="pref-loc-custom-tag">
+                      {loc}
+                      <button type="button" onClick={() => toggleLocation(loc)} disabled={saving}>×</button>
+                    </span>
                   ))}
                 </div>
               )}

@@ -3,9 +3,85 @@ import { supabase } from '../supabaseClient';
 import { connectGoogleCalendar, createGoogleCalendarEvent } from '../services/googleCalendarService';
 import '../styles/MyGroup.css';
 
+// ─── Scoring constants ────────────────────────────────────────────────────────
+const DAY_ABBRS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const QUORUM = 4;
+const MAX_RAW = 120; // 50 + 30 + 20 + 20
+
+function isCoordinateGroup(group) {
+  if (group.schedule_type === 'coordinate') return true;
+  if (!group.day_of_week || !group.time_slot) return true;
+  if (typeof group.time_slot === 'string' && /coordinate/i.test(group.time_slot)) return true;
+  return false;
+}
+
+function studentOverlapsGroup(availabilityDates, dayOfWeek, timeSlot) {
+  return Object.entries(availabilityDates || {}).some(([dateKey, times]) => {
+    const abbr = DAY_ABBRS[new Date(`${dateKey}T00:00:00`).getDay()];
+    return abbr === dayOfWeek && (times || []).includes(timeSlot);
+  });
+}
+
+function groupMajorityLocations(group) {
+  const counts = {};
+  (group.members || []).forEach((m) => {
+    (m.preferred_locations || []).forEach((loc) => {
+      counts[loc] = (counts[loc] || 0) + 1;
+    });
+  });
+  if (!Object.keys(counts).length) return [];
+  const max = Math.max(...Object.values(counts));
+  return Object.keys(counts).filter((l) => counts[l] === max);
+}
+
+function scoreGroup(group, student) {
+  if (!student) return 0;
+  if (group.status === 'cancelled') return 0;
+
+  const coordinate = isCoordinateGroup(group);
+
+  if (!coordinate && !studentOverlapsGroup(
+    student.availability_dates, group.day_of_week, group.time_slot
+  )) {
+    return 0;
+  }
+
+  let raw = 0;
+  if ((student.classes || []).includes(group.class_code)) raw += 50;
+  raw += Math.min((group.members?.length || 0) / QUORUM, 1) * 30;
+  if (group.status === 'forming') raw += 20;
+  const majority = groupMajorityLocations(group);
+  if (majority.length && (student.preferred_locations || []).some((l) => majority.includes(l))) {
+    raw += 20;
+  }
+
+  const normalized = (raw / MAX_RAW) * 100;
+  return coordinate ? Math.min(normalized, 90) : normalized;
+}
+
+// Reads pre-computed group.matchScore, cancelled always last.
+function sortByScore(groups) {
+  return [...groups].sort((a, b) => {
+    const aCancelled = a.status === 'cancelled';
+    const bCancelled = b.status === 'cancelled';
+    if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
+    return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+  });
+}
+
+function getScoreMeta(score, status) {
+  if (status === 'cancelled') return { label: 'Cancelled', cls: 'match-score-cancelled' };
+  if (score === 0) return { label: 'No overlap', cls: 'match-score-none' };
+  if (score >= 75) return { label: `${Math.round(score)}% match`, cls: 'match-score-high' };
+  if (score >= 40) return { label: `${Math.round(score)}% match`, cls: 'match-score-med' };
+  return { label: `${Math.round(score)}% match`, cls: 'match-score-low' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function MyGroup({ userId }) {
   const [groups, setGroups] = useState([]);
   const [userClasses, setUserClasses] = useState([]);
+  const [studentProfile, setStudentProfile] = useState(null);
   const [potentialGroupsByClass, setPotentialGroupsByClass] = useState({});
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -52,7 +128,7 @@ export default function MyGroup({ userId }) {
         const { data: studentDetails } = memberIds.length > 0
           ? await supabase
             .from('students')
-            .select('user_id, first_name, last_name, instagram, phone, classes, availability_dates, google_calendar_connected')
+            .select('user_id, first_name, last_name, instagram, phone, classes, availability_dates, preferred_locations, google_calendar_connected')
             .in('user_id', memberIds)
           : { data: [] };
 
@@ -71,14 +147,15 @@ export default function MyGroup({ userId }) {
   const fetchMyGroups = useCallback(async () => {
     setLoading(true);
 
-    const { data: studentProfile } = await supabase
+    const { data: student } = await supabase
       .from('students')
-      .select('classes')
+      .select('classes, availability_dates, preferred_locations')
       .eq('user_id', userId)
       .maybeSingle();
 
-    const classes = studentProfile?.classes || [];
+    const classes = student?.classes || [];
     setUserClasses(classes);
+    setStudentProfile(student);
 
     const { data: memberships } = await supabase
       .from('group_members')
@@ -94,7 +171,10 @@ export default function MyGroup({ userId }) {
       : { data: [] };
 
     const myGroups = await enrichGroups(myGroupDetails || []);
-    setGroups(myGroups);
+    const scoredMyGroups = sortByScore(
+      myGroups.map((g) => ({ ...g, matchScore: scoreGroup(g, student) }))
+    );
+    setGroups(scoredMyGroups);
 
     const { data: potentialGroupDetails } = classes.length > 0
       ? await supabase
@@ -108,16 +188,12 @@ export default function MyGroup({ userId }) {
     const groupedPotentialGroups = potentialGroups.reduce((acc, group) => {
       const classCode = group.class_code || 'Other';
       if (!acc[classCode]) acc[classCode] = [];
-      acc[classCode].push(group);
+      acc[classCode].push({ ...group, matchScore: scoreGroup(group, student) });
       return acc;
     }, {});
 
-    Object.values(groupedPotentialGroups).forEach((classGroups) => {
-      classGroups.sort((a, b) => {
-        const dayCompare = (a.day_of_week || '').localeCompare(b.day_of_week || '');
-        if (dayCompare !== 0) return dayCompare;
-        return (a.time_slot || '').localeCompare(b.time_slot || '');
-      });
+    Object.keys(groupedPotentialGroups).forEach((classCode) => {
+      groupedPotentialGroups[classCode] = sortByScore(groupedPotentialGroups[classCode]);
     });
 
     setPotentialGroupsByClass(groupedPotentialGroups);
@@ -306,6 +382,10 @@ export default function MyGroup({ userId }) {
             )}
           </div>
           <div className="group-header-right">
+            {group.matchScore !== undefined && (() => {
+              const { label, cls } = getScoreMeta(group.matchScore, group.status);
+              return <span className={`match-score-badge ${cls}`}>{label}</span>;
+            })()}
             <span className="member-count-badge">{group.members.length} members</span>
             {canJoin && (
               <button className="join-btn" onClick={() => joinGroup(group.id)}>
@@ -331,6 +411,7 @@ export default function MyGroup({ userId }) {
     return <div className="loading-container"><div className="loading-spinner">Loading...</div></div>;
   }
 
+  // groups is already sorted by score; keep the availability filter, order is preserved.
   const matchedGroups = groups.filter((group) => group.matched_availability && group.matched_availability.length > 0);
   const classSections = userClasses.length > 0 ? userClasses : Object.keys(potentialGroupsByClass);
 
