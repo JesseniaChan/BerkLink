@@ -202,3 +202,4 @@ export async function getGoogleCalendarAvailability({
 
   return response.result?.calendars || {};
 }
+      
