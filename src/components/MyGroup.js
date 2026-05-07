@@ -81,7 +81,6 @@ function getScoreMeta(score, status) {
 export default function MyGroup({ userId }) {
   const [groups, setGroups] = useState([]);
   const [userClasses, setUserClasses] = useState([]);
-  const [studentProfile, setStudentProfile] = useState(null);
   const [potentialGroupsByClass, setPotentialGroupsByClass] = useState({});
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
