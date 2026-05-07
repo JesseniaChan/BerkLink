@@ -69,7 +69,7 @@ export default function Friends({ userId }) {
 
       const allIds = [...new Set([...friendIds, ...incomingIds])];
       const { data: students } = allIds.length > 0
-        ? await supabase.from('students').select('user_id,instagram,classes').in('user_id', allIds)
+        ? await supabase.from('students').select('user_id,first_name,last_name,instagram,classes').in('user_id', allIds)
         : { data: [] };
 
       const studentMap = Object.fromEntries((students || []).map((s) => [s.user_id, s]));
@@ -128,7 +128,7 @@ export default function Friends({ userId }) {
       setSearching(true);
       const { data } = await supabase
         .from('students')
-        .select('user_id,instagram,classes')
+        .select('user_id,first_name,last_name,instagram,classes')
         .ilike('instagram', `%${searchQuery.trim()}%`)
         .neq('user_id', userId)
         .limit(8);
@@ -237,6 +237,11 @@ export default function Friends({ userId }) {
     return 'none';
   }
 
+  function studentDisplayName(s) {
+    const full = [s?.first_name, s?.last_name].filter(Boolean).join(' ');
+    return full || s?.instagram || 'unknown';
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
   if (loading) {
     return <div className="friends-loading"><div className="friends-spinner" /></div>;
@@ -308,8 +313,9 @@ export default function Friends({ userId }) {
                   const status = friendStatus(s.user_id);
                   return (
                     <div key={s.user_id} className="search-result-row">
-                      <div className="sr-avatar">{s.instagram?.[0]?.toUpperCase() || '?'}</div>
+                      <div className="sr-avatar">{(s.first_name || s.instagram)?.[0]?.toUpperCase() || '?'}</div>
                       <div className="sr-info">
+                        <div className="sr-name">{studentDisplayName(s)}</div>
                         <div className="sr-handle">@{s.instagram}</div>
                         {s.classes?.length > 0 && (
                           <div className="sr-classes">{s.classes.slice(0, 3).join(' · ')}</div>
@@ -342,9 +348,10 @@ export default function Friends({ userId }) {
                 {incoming.map(({ friendship, student }) => (
                   <div key={friendship.id} className="request-row">
                     <div className="sr-avatar req-avatar">
-                      {student?.instagram?.[0]?.toUpperCase() || '?'}
+                      {(student?.first_name || student?.instagram)?.[0]?.toUpperCase() || '?'}
                     </div>
                     <div className="sr-info">
+                      <div className="sr-name">{studentDisplayName(student)}</div>
                       <div className="sr-handle">@{student?.instagram || 'unknown'}</div>
                     </div>
                     <div className="req-actions">
@@ -409,9 +416,10 @@ export default function Friends({ userId }) {
                   <div key={friendship.id} className="friend-card">
                     <div className="friend-card-top">
                       <div className="friend-avatar">
-                        {student.instagram?.[0]?.toUpperCase() || '?'}
+                        {(student.first_name || student.instagram)?.[0]?.toUpperCase() || '?'}
                       </div>
                       <div className="friend-info">
+                        <div className="friend-name">{studentDisplayName(student)}</div>
                         <div className="friend-handle">@{student.instagram}</div>
                         {student.classes?.length > 0 && (
                           <div className="friend-classes">

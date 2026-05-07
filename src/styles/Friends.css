@@ -170,10 +170,19 @@
 
 .sr-info { flex: 1; min-width: 0; }
 
-.sr-handle {
-  font-weight: 600;
+.sr-name {
+  font-weight: 700;
   font-size: 13px;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-handle {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -418,10 +427,19 @@
 
 .friend-info { flex: 1; min-width: 0; }
 
-.friend-handle {
+.friend-name {
   font-weight: 700;
   font-size: 15px;
   color: var(--blue);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-handle {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
