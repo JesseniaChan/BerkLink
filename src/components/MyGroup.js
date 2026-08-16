@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { connectGoogleCalendar, createGoogleCalendarEvent } from '../services/googleCalendarService';
+import { rematchStudent } from '../services/matchingService';
 import '../styles/MyGroup.css';
 
 // ─── Scoring constants ────────────────────────────────────────────────────────
@@ -116,34 +117,6 @@ export default function MyGroup({ userId }) {
     return shared;
   }
 
-  const enrichGroups = useCallback(async (rawGroups) => {
-    const enriched = await Promise.all(
-      (rawGroups || []).map(async (group) => {
-        const { data: members } = await supabase
-          .from('group_members')
-          .select('user_id')
-          .eq('group_id', group.id);
-
-        const memberIds = (members || []).map((member) => member.user_id);
-        const { data: studentDetails } = memberIds.length > 0
-          ? await supabase
-            .from('students')
-            .select('user_id, first_name, last_name, instagram, phone, classes, availability_dates, preferred_locations, google_calendar_connected')
-            .in('user_id', memberIds)
-          : { data: [] };
-
-        return {
-          ...group,
-          members: studentDetails || [],
-          matched_availability: getSharedAvailability(studentDetails || []),
-          isUserMember: memberIds.includes(userId),
-        };
-      })
-    );
-
-    return enriched;
-  }, [userId]);
-
   const fetchMyGroups = useCallback(async () => {
     setLoading(true);
 
@@ -162,29 +135,63 @@ export default function MyGroup({ userId }) {
       .select('group_id')
       .eq('user_id', userId);
 
-    const groupIds = (memberships || []).map((membership) => membership.group_id);
-    const { data: myGroupDetails } = groupIds.length > 0
-      ? await supabase
-        .from('study_groups')
-        .select('*')
-        .in('id', groupIds)
+    const myGroupIds = (memberships || []).map((membership) => membership.group_id);
+
+    const [{ data: myGroupDetails }, { data: potentialGroupDetails }] = await Promise.all([
+      myGroupIds.length > 0
+        ? supabase.from('study_groups').select('*').in('id', myGroupIds)
+        : Promise.resolve({ data: [] }),
+      classes.length > 0
+        ? supabase.from('study_groups').select('*').in('class_code', classes)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    // De-duplicate across "my groups" and "potential groups" so member/student
+    // data for every group involved is fetched in two queries total, instead
+    // of two round-trips per group (the old N+1 pattern).
+    const allGroupsById = new Map();
+    (myGroupDetails || []).forEach((g) => allGroupsById.set(g.id, g));
+    (potentialGroupDetails || []).forEach((g) => allGroupsById.set(g.id, g));
+    const allGroupIds = Array.from(allGroupsById.keys());
+
+    const { data: allMembers } = allGroupIds.length > 0
+      ? await supabase.from('group_members').select('group_id, user_id').in('group_id', allGroupIds)
       : { data: [] };
 
-    const myGroups = await enrichGroups(myGroupDetails || []);
+    const allUserIds = Array.from(new Set((allMembers || []).map((m) => m.user_id)));
+
+    const { data: allStudents } = allUserIds.length > 0
+      ? await supabase
+        .from('students')
+        .select('user_id, first_name, last_name, instagram, phone, classes, availability_dates, preferred_locations, google_calendar_connected')
+        .in('user_id', allUserIds)
+      : { data: [] };
+
+    const studentsById = new Map((allStudents || []).map((s) => [s.user_id, s]));
+    const membersByGroup = new Map();
+    (allMembers || []).forEach((m) => {
+      if (!membersByGroup.has(m.group_id)) membersByGroup.set(m.group_id, []);
+      membersByGroup.get(m.group_id).push(m.user_id);
+    });
+
+    function enrichGroup(group) {
+      const memberIds = membersByGroup.get(group.id) || [];
+      const studentDetails = memberIds.map((id) => studentsById.get(id)).filter(Boolean);
+      return {
+        ...group,
+        members: studentDetails,
+        matched_availability: getSharedAvailability(studentDetails),
+        isUserMember: memberIds.includes(userId),
+      };
+    }
+
+    const myGroups = (myGroupDetails || []).map(enrichGroup);
     const scoredMyGroups = sortByScore(
       myGroups.map((g) => ({ ...g, matchScore: scoreGroup(g, student) }))
     );
     setGroups(scoredMyGroups);
 
-    const { data: potentialGroupDetails } = classes.length > 0
-      ? await supabase
-        .from('study_groups')
-        .select('*')
-        .in('class_code', classes)
-      : { data: [] };
-
-    const allPotentialGroups = await enrichGroups(potentialGroupDetails || []);
-    const potentialGroups = allPotentialGroups.filter((g) => !g.isUserMember);
+    const potentialGroups = (potentialGroupDetails || []).map(enrichGroup).filter((g) => !g.isUserMember);
     const groupedPotentialGroups = potentialGroups.reduce((acc, group) => {
       const classCode = group.class_code || 'Other';
       if (!acc[classCode]) acc[classCode] = [];
@@ -198,7 +205,7 @@ export default function MyGroup({ userId }) {
 
     setPotentialGroupsByClass(groupedPotentialGroups);
     setLoading(false);
-  }, [enrichGroups, userId]);
+  }, [userId]);
 
   useEffect(() => {
     fetchMyGroups();
@@ -206,9 +213,9 @@ export default function MyGroup({ userId }) {
 
   async function runMatcher() {
     setRunning(true);
-    const { error } = await supabase.rpc('auto_assign_groups');
+    const { ok, error } = await rematchStudent(userId);
     setRunning(false);
-    if (error) showToast(`Error: ${error.message}`);
+    if (!ok) showToast(`Error: ${error}`);
     else {
       showToast('Groups updated!');
       fetchMyGroups();
@@ -283,35 +290,27 @@ export default function MyGroup({ userId }) {
   }, [createCalendarEventForGroup, groups, userId]);
 
   async function leaveGroup(groupId) {
-    await supabase
+    const { error: leaveError } = await supabase
       .from('group_members')
       .delete()
       .eq('group_id', groupId)
       .eq('user_id', userId);
 
+    if (leaveError) {
+      showToast(`Couldn't leave group: ${leaveError.message}`);
+      return;
+    }
+
+    const { ok, error } = await rematchStudent(userId);
+    if (!ok) console.error('Rematch after leaving group failed:', error);
+
+    showToast(ok ? 'Left group — looking for a new match...' : 'Left group.');
     fetchMyGroups();
   }
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
-  }
-
-  function formatExactTimes(sharedAvailability) {
-    if (!sharedAvailability || sharedAvailability.length === 0) {
-      return 'No exact times matched yet';
-    }
-
-    return sharedAvailability
-      .map(({ date, times }) => {
-        const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        });
-        return `${dateLabel}: ${times.join(', ')}`;
-      })
-      .join(' · ');
   }
 
   function memberDisplayName(member) {
@@ -343,7 +342,11 @@ export default function MyGroup({ userId }) {
   }
 
   async function joinGroup(groupId) {
-    await supabase.from('group_members').insert({ group_id: groupId, user_id: userId });
+    const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: userId });
+    if (error) {
+      showToast(`Couldn't join group: ${error.message}`);
+      return;
+    }
     fetchMyGroups();
   }
 
@@ -359,11 +362,6 @@ export default function MyGroup({ userId }) {
               {group.day_of_week && <span>📅 {group.day_of_week}</span>}
               {group.time_slot && <span>🕐 {group.time_slot}</span>}
             </div>
-            {group.matched_availability && group.matched_availability.length > 0 && (
-              <div className="group-exact-times">
-                Exact matches: {formatExactTimes(group.matched_availability)}
-              </div>
-            )}
             {showCalendarSync && (
               <div className="group-calendar-sync">
                 {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
@@ -411,8 +409,7 @@ export default function MyGroup({ userId }) {
     return <div className="loading-container"><div className="loading-spinner">Loading...</div></div>;
   }
 
-  // groups is already sorted by score; keep the availability filter, order is preserved.
-  const matchedGroups = groups.filter((group) => group.matched_availability && group.matched_availability.length > 0);
+  // groups already contains every group the user is a member of, sorted by score.
   const classSections = userClasses.length > 0 ? userClasses : Object.keys(potentialGroupsByClass);
 
   return (
@@ -500,18 +497,18 @@ export default function MyGroup({ userId }) {
       <div className="groups-section">
         <div className="section-heading">
           <h3>Your Groups</h3>
-          <p>Groups that already match your class and exact time availability.</p>
+          <p>Groups you're currently a member of.</p>
         </div>
 
-        {matchedGroups.length === 0 ? (
+        {groups.length === 0 ? (
           <div className="empty-state compact">
             <div className="empty-icon">?</div>
-            <h3>No matched groups yet</h3>
-            <p>Click "Find / Refresh My Groups" above to get matched with students in your classes on the same dates and times.</p>
+            <h3>No groups yet</h3>
+            <p>Click "Find / Refresh My Groups" above, or join a potential group below.</p>
           </div>
         ) : (
           <div className="groups-list">
-            {matchedGroups.map((group) => renderGroupCard(group, { canLeave: true, showCalendarSync: true }))}
+            {groups.map((group) => renderGroupCard(group, { canLeave: true, showCalendarSync: true }))}
           </div>
         )}
       </div>

@@ -2,12 +2,40 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import '../styles/LoginForm.css';
 
-export default function LoginForm({ onSwitchToSignup, onSwitchToForgotPassword }) {
+export default function LoginForm({ onSwitchToSignup, onSwitchToForgotPassword, authError }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            hd: 'berkeley.edu',
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message || 'Could not start Google sign in. Please try again.');
+        setGoogleLoading(false);
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Google login error:', err);
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,12 +109,25 @@ export default function LoginForm({ onSwitchToSignup, onSwitchToForgotPassword }
           </div>
         )}
 
-        {error && (
+        {(authError || error) && (
           <div className="error-message">
             <span className="error-icon">⚠</span>
-            {error}
+            {authError || error}
           </div>
         )}
+
+        <button
+          type="button"
+          className="login-button google-button"
+          onClick={handleGoogleLogin}
+          disabled={googleLoading || loading || success}
+        >
+          {googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}
+        </button>
+
+        <div className="auth-divider">
+          <span>or sign in with password</span>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

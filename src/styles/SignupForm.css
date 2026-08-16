@@ -126,6 +126,16 @@
   cursor: not-allowed;
 }
 
+.google-button {
+  background: white;
+  color: #3c4043;
+  border: 2px solid #e0e0e0;
+}
+
+.google-button:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .login-link {
   text-align: center;
   color: #666;

@@ -16,6 +16,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
   const [page, setPage] = useState('onboarding');
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     // Check for recovery token in URL (when user clicks reset link in email)
@@ -24,18 +25,21 @@ function App() {
       setAuthForm('resetPassword');
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        checkProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
+          // Google's "hd" hint isn't enforced server-side, so verify the
+          // Berkeley domain ourselves before granting access.
+          if (!session.user.email?.toLowerCase().endsWith('@berkeley.edu')) {
+            setAuthError('Please sign in with a @berkeley.edu Google account.');
+            await supabase.auth.signOut();
+            setUser(null);
+            setHasProfile(false);
+            setLoading(false);
+            return;
+          }
+
+          setAuthError('');
           setUser(session.user);
           checkProfile(session.user.id);
         } else {
@@ -147,10 +151,11 @@ function App() {
         <LoginForm
           onSwitchToSignup={() => setAuthForm('signup')}
           onSwitchToForgotPassword={() => setAuthForm('forgotPassword')}
+          authError={authError}
         />
       )}
       {authForm === 'signup' && (
-        <SignupForm onSwitchToLogin={() => setAuthForm('login')} />
+        <SignupForm onSwitchToLogin={() => setAuthForm('login')} authError={authError} />
       )}
       {authForm === 'forgotPassword' && (
         <ForgotPasswordForm onSwitchToLogin={() => setAuthForm('login')} />

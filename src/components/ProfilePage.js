@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getOnboardingData, saveOnboardingStep } from '../services/onboardingService';
 import { connectGoogleCalendar } from '../services/googleCalendarService';
+import { rematchStudent } from '../services/matchingService';
 import '../styles/ProfilePage.css';
 
 const DEFAULT_CLASSES = [
@@ -386,6 +387,12 @@ export default function ProfilePage({ userId, onProfileUpdated, onGoToOnboarding
       setProfile(savedData);
       setSuccess('Profile updated successfully.');
       setEditMode(false);
+
+      // Best-effort, scoped to this student only — never blocks the save confirmation.
+      rematchStudent(userId).then(({ ok, error: rematchError }) => {
+        if (!ok) console.error('Rematch after profile update failed:', rematchError);
+      });
+
       if (typeof onProfileUpdated === 'function') {
         onProfileUpdated();
       }

@@ -5,6 +5,7 @@ import Classes from './Classes';
 import StudyLocations from './StudyLocations';
 import PreferredLocations from './PreferredLocations';
 import { markOnboardingComplete } from '../services/onboardingService';
+import { rematchStudent } from '../services/matchingService';
 import '../styles/OnboardingWrapper.css';
 
 const ONBOARDING_STEPS = [
@@ -90,6 +91,11 @@ export default function OnboardingWrapper({ userId, onComplete }) {
       await markOnboardingComplete(userId);
 
       console.log('Onboarding marked as complete in Supabase');
+
+      const { ok, error: rematchError } = await rematchStudent(userId);
+      if (!ok) {
+        console.error('Rematch after onboarding failed:', rematchError);
+      }
 
       // Call the parent callback
       if (onComplete) {

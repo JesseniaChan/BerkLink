@@ -11,14 +11,24 @@ export default function ResetPasswordForm({ onResetComplete, onSwitchToLogin }) 
   const [hasValidSession, setHasValidSession] = useState(false);
 
   useEffect(() => {
+    let ignore = false;
+
     // Check if user has a valid recovery session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (ignore) return;
       if (session?.user) {
         setHasValidSession(true);
       } else {
         setError('Invalid or expired reset link. Please request a new one.');
       }
+    }).catch(() => {
+      // Ignore aborted requests caused by an overlapping auth lock request
+      // (e.g. React StrictMode double-invoking this effect in dev).
     });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   // Validate password requirements
