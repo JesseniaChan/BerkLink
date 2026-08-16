@@ -401,7 +401,11 @@ export default function MyGroup({ userId }) {
             </div>
             {showCalendarSync && (
               <div className="group-calendar-sync">
-                {group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
+                {!group.members.some((member) => member.user_id === userId && member.google_calendar_connected) ? (
+                  <span className="calendar-sync-note">Connect Google Calendar from your profile to sync.</span>
+                ) : !group.matched_availability || group.matched_availability.length === 0 ? (
+                  <span className="calendar-sync-note">Sync unlocks once everyone agrees on an exact date &amp; time.</span>
+                ) : (
                   <button
                     className="sync-calendar-btn"
                     type="button"
@@ -410,8 +414,6 @@ export default function MyGroup({ userId }) {
                   >
                     {calendarStatus[group.id]?.loading ? 'Syncing...' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
                   </button>
-                ) : (
-                  <span className="calendar-sync-note">Connect Google Calendar from your profile to sync.</span>
                 )}
               </div>
             )}
