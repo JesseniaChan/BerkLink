@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { connectGoogleCalendar, createGoogleCalendarEvent } from '../services/googleCalendarService';
+import { connectGoogleCalendar, createGoogleCalendarEvent, hasGoogleCalendarAccess } from '../services/googleCalendarService';
 import { rematchStudent } from '../services/matchingService';
 import '../styles/MyGroup.css';
 
@@ -117,23 +117,25 @@ export default function MyGroup({ userId }) {
     return shared;
   }
 
-  const fetchMyGroups = useCallback(async () => {
-    setLoading(true);
+  const fetchMyGroups = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
 
-    const { data: student } = await supabase
-      .from('students')
-      .select('classes, availability_dates, preferred_locations')
-      .eq('user_id', userId)
-      .maybeSingle();
+    // Independent queries — run in parallel instead of one-after-another.
+    const [{ data: student }, { data: memberships }] = await Promise.all([
+      supabase
+        .from('students')
+        .select('classes, availability_dates, preferred_locations')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', userId),
+    ]);
 
     const classes = student?.classes || [];
     setUserClasses(classes);
     setStudentProfile(student);
-
-    const { data: memberships } = await supabase
-      .from('group_members')
-      .select('group_id')
-      .eq('user_id', userId);
 
     const myGroupIds = (memberships || []).map((membership) => membership.group_id);
 
@@ -218,7 +220,7 @@ export default function MyGroup({ userId }) {
     if (!ok) showToast(`Error: ${error}`);
     else {
       showToast('Groups updated!');
-      fetchMyGroups();
+      fetchMyGroups({ silent: true });
     }
   }
 
@@ -236,11 +238,19 @@ export default function MyGroup({ userId }) {
     return { start, end };
   }
 
-  const createCalendarEventForGroup = useCallback(async (group, storageKey) => {
+  const createCalendarEventForGroup = useCallback(async (group, storageKey, { interactive = false } = {}) => {
     if (!group.matched_availability || group.matched_availability.length === 0) return;
 
     const [match] = group.matched_availability;
     if (!match?.times || match.times.length === 0) return;
+
+    if (!interactive && !hasGoogleCalendarAccess()) {
+      // Background auto-sync only runs when a token is already cached from
+      // earlier this session — opening a Google auth popup from a non-click
+      // context gets blocked by the browser anyway. The manual "Sync to
+      // Google Calendar" button (interactive: true) handles first connect.
+      return;
+    }
 
     setCalendarStatus((prev) => ({
       ...prev,
@@ -248,7 +258,9 @@ export default function MyGroup({ userId }) {
     }));
 
     try {
-      await connectGoogleCalendar();
+      if (interactive) {
+        await connectGoogleCalendar();
+      }
       const { start, end } = getEventStartEnd(match.date, match.times[0]);
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -290,6 +302,12 @@ export default function MyGroup({ userId }) {
   }, [createCalendarEventForGroup, groups, userId]);
 
   async function leaveGroup(groupId) {
+    // Optimistic: drop it from view immediately instead of waiting on the
+    // delete + rematch + refetch round-trips before anything visibly changes.
+    const previousGroups = groups;
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+    showToast('Left group — looking for a new match...');
+
     const { error: leaveError } = await supabase
       .from('group_members')
       .delete()
@@ -297,6 +315,7 @@ export default function MyGroup({ userId }) {
       .eq('user_id', userId);
 
     if (leaveError) {
+      setGroups(previousGroups);
       showToast(`Couldn't leave group: ${leaveError.message}`);
       return;
     }
@@ -304,8 +323,9 @@ export default function MyGroup({ userId }) {
     const { ok, error } = await rematchStudent(userId);
     if (!ok) console.error('Rematch after leaving group failed:', error);
 
-    showToast(ok ? 'Left group — looking for a new match...' : 'Left group.');
-    fetchMyGroups();
+    // Reconcile quietly in the background — no loading spinner, since the
+    // optimistic removal already reflects the intended outcome.
+    fetchMyGroups({ silent: true });
   }
 
   function showToast(msg) {
@@ -341,13 +361,30 @@ export default function MyGroup({ userId }) {
     );
   }
 
-  async function joinGroup(groupId) {
-    const { error } = await supabase.from('group_members').insert({ group_id: groupId, user_id: userId });
+  async function joinGroup(group) {
+    // Optimistic: move the already-fetched card straight into "Your Groups"
+    // instead of waiting on insert + refetch before it appears.
+    const previousGroups = groups;
+    const previousPotential = potentialGroupsByClass;
+    const classCode = group.class_code || 'Other';
+
+    setGroups((prev) => sortByScore([...prev, { ...group, isUserMember: true }]));
+    setPotentialGroupsByClass((prev) => ({
+      ...prev,
+      [classCode]: (prev[classCode] || []).filter((g) => g.id !== group.id),
+    }));
+
+    const { error } = await supabase.from('group_members').insert({ group_id: group.id, user_id: userId });
     if (error) {
+      setGroups(previousGroups);
+      setPotentialGroupsByClass(previousPotential);
       showToast(`Couldn't join group: ${error.message}`);
       return;
     }
-    fetchMyGroups();
+
+    // Reconcile quietly in the background to pick up the authoritative
+    // member list/score — no loading spinner, the card is already visible.
+    fetchMyGroups({ silent: true });
   }
 
   function renderGroupCard(group, options = {}) {
@@ -368,7 +405,7 @@ export default function MyGroup({ userId }) {
                   <button
                     className="sync-calendar-btn"
                     type="button"
-                    onClick={() => createCalendarEventForGroup(group)}
+                    onClick={() => createCalendarEventForGroup(group, undefined, { interactive: true })}
                     disabled={calendarStatus[group.id]?.loading}
                   >
                     {calendarStatus[group.id]?.loading ? 'Syncing...' : (calendarStatus[group.id]?.message || 'Sync to Google Calendar')}
@@ -386,7 +423,7 @@ export default function MyGroup({ userId }) {
             })()}
             <span className="member-count-badge">{group.members.length} members</span>
             {canJoin && (
-              <button className="join-btn" onClick={() => joinGroup(group.id)}>
+              <button className="join-btn" onClick={() => joinGroup(group)}>
                 Join
               </button>
             )}

@@ -153,6 +153,16 @@ export async function connectGoogleCalendar() {
   return true;
 }
 
+/**
+ * Synchronous, no-network check for whether we already hold a live access
+ * token in memory. Safe to call from anywhere (including background effects)
+ * since it never triggers an OAuth flow — Google's consent/token popup can
+ * only be opened from a real user gesture, or browsers block it outright.
+ */
+export function hasGoogleCalendarAccess() {
+  return Boolean(window.gapi?.client?.getToken?.()?.access_token);
+}
+
 export async function createGoogleCalendarEvent({ summary, description, startDateTime, endDateTime, timeZone }) {
   const gapi = await ensureCalendarApiLoaded();
   await ensureGoogleCalendarAccess();
